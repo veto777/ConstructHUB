@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SMS_SEGMENT_SIZES, smsEncoding, smsSegments } from "./sms-segments";
+import { SMS_SEGMENT_SIZES, gsmSafeText, smsEncoding, smsSegments } from "./sms-segments";
 
 // The segment counter behind the monthly text allowance (audit A1-3): GSM-7
 // 160/153 with two-septet extension characters, UCS-2 70/67 in UTF-16 units.
@@ -47,5 +47,19 @@ describe("sms segment counting (pure)", () => {
     expect(smsSegments("Alpine Siding: reminder — estimate 1042 for $4,250.00 is waiting: https://constructhub.us/e/abc123?k=deadbeef")).toBe(2); // the em dash makes it UCS-2
     expect(smsSegments("Alpine Siding: reminder - estimate 1042 for $4,250.00 is waiting: https://constructhub.us/e/abc123?k=deadbeef")).toBe(1);
     expect(smsSegments("ConstructHub: you're opted in to account-notification texts (estimate opens, approvals, payments). Msg frequency varies. Msg&data rates may apply. Reply STOP to opt out, HELP for help.")).toBe(2);
+  });
+});
+
+// Audit C5: system templates carried an em dash, which billed them as UCS-2.
+describe("gsmSafeText (pure)", () => {
+  it("swaps typographic punctuation for GSM-7 and leaves the rest alone", () => {
+    expect(gsmSafeText("reminder \u2014 it\u2019s \u201Cready\u201D\u2026 9\u20135")).toBe("reminder - it's \"ready\"... 9-5");
+    expect(gsmSafeText("Thanks \u{1F44B} caf\u00E9")).toBe("Thanks \u{1F44B} caf\u00E9");
+  });
+
+  it("the estimate reminder now meters as GSM-7", () => {
+    const text = "Alpine Siding: reminder \u2014 estimate 1042 for $4,250.00 is waiting: https://constructhub.us/e/abc123?k=deadbeef";
+    expect(smsEncoding(gsmSafeText(text))).toBe("gsm7");
+    expect(smsSegments(gsmSafeText(text))).toBe(1);
   });
 });

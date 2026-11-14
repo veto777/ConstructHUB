@@ -216,9 +216,9 @@ describe("opt-out suppression seam (real test DB)", () => {
 });
 
 describe("voice email-nudge (pure)", () => {
-  it("the toggle reads custom_fields->voiceNudge (default OFF)", () => {
+  it("is OFF for everyone: a stored voiceNudge=true no longer turns it on", () => {
     expect(voiceNudgeOnEstimate(null)).toBe(false);
-    expect(voiceNudgeOnEstimate({ voiceNudge: true })).toBe(true);
+    expect(voiceNudgeOnEstimate({ voiceNudge: true })).toBe(false);
     expect(voiceNudgeOnEstimate({ voiceNudge: false })).toBe(false);
   });
 
@@ -228,17 +228,16 @@ describe("voice email-nudge (pure)", () => {
     expect(twiml).toContain("check your email inbox or spam folder");
   });
 
-  it("unconfigured dev records a log call instead of dialing — and never throws", async () => {
+  it("unconfigured dev: places nothing and records nothing, and never throws", async () => {
     const outbox = path.join(process.cwd(), "tmp", `voice-test-${Date.now()}.jsonl`);
     const savedPath = process.env.VOICE_OUTBOX_PATH;
     process.env.VOICE_OUTBOX_PATH = outbox;
     await withSwEnv({}, async () => {
       try {
-        const r = await placeEmailNudgeCall("+15551234567", { name: "Vitest Roofing", customFields: null });
-        expect(r).toEqual({ ok: true, provider: "log", sid: null });
-        const lines = fs.readFileSync(outbox, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-        expect(lines.at(-1)).toMatchObject({ provider: "log", to: "+15551234567" });
-        expect(lines.at(-1).twiml).toContain("Vitest Roofing");
+        const r = await placeEmailNudgeCall("+15551234567", { name: "Vitest Roofing", customFields: { voiceNudge: true } });
+        expect(r.ok).toBe(false);
+        expect(r.provider).toBe("log");
+        expect(fs.existsSync(outbox)).toBe(false);
       } finally {
         if (savedPath === undefined) delete process.env.VOICE_OUTBOX_PATH;
         else process.env.VOICE_OUTBOX_PATH = savedPath;
@@ -247,21 +246,16 @@ describe("voice email-nudge (pure)", () => {
     });
   });
 
-  it("configured: POSTs From/To/Twiml to Accounts/{project}/Calls.json with basic auth", async () => {
+  it("configured: never reaches the carrier", async () => {
     await withSwEnv(SW_ENV, async () => {
       const calls: { url: string; init: any }[] = [];
       vi.stubGlobal("fetch", async (url: any, init: any) => {
         calls.push({ url: String(url), init });
         return { ok: true, status: 201, json: async () => ({ sid: "CAabc123" }) };
       });
-      const r = await placeEmailNudgeCall("+15551234567", { name: "Vitest Roofing", customFields: null });
-      expect(r).toEqual({ ok: true, provider: "signalwire", sid: "CAabc123" });
-      expect(calls).toHaveLength(1);
-      expect(calls[0].url).toBe("https://x.signalwire.com/api/laml/2010-04-01/Accounts/proj-1/Calls.json");
-      const params = new URLSearchParams(calls[0].init.body);
-      expect(params.get("From")).toBe("+15550001111");
-      expect(params.get("To")).toBe("+15551234567");
-      expect(params.get("Twiml")).toContain("<Response><Say>");
+      const r = await placeEmailNudgeCall("+15551234567", { name: "Vitest Roofing", customFields: { voiceNudge: true } });
+      expect(r.ok).toBe(false);
+      expect(calls).toHaveLength(0);
     });
   });
 });
@@ -522,51 +516,31 @@ describe("SMS compliance against the dev server", () => {
     }
   });
 
-  it("voice nudge: toggle ON places a (log) call on estimate send; toggle OFF stays silent", async () => {
+  it("voice nudge is OFF for everyone: a stored voiceNudge=true places no call on estimate send", async () => {
     // The server resolves its log outbox from ITS cwd (server/crm/voice.ts);
-    // a test run from another tree must find the file the server actually
-    // writes. Env wins (same override the server honors), then this tree's
+    // a test run from another tree must look at the file the server would
+    // write. Env wins (same override the server honors), then this tree's
     // tmp/, then the shared dev tree when the test targets that server.
     const candidates = [
       process.env.VOICE_OUTBOX_PATH,
       path.join(process.cwd(), "tmp", "voice-outbox.jsonl"),
       process.env.CRM_TEST_BASE_URL ? "/home/veto/ConstructHUB/tmp/voice-outbox.jsonl" : null,
     ].filter(Boolean) as string[];
-    let outboxPath = candidates[candidates.length - 1];
-    const readOutbox = () =>
-      fs.existsSync(outboxPath) ? fs.readFileSync(outboxPath, "utf8") : "";
+    const readAll = () =>
+      candidates.map((p) => (fs.existsSync(p) ? fs.readFileSync(p, "utf8") : "")).join("\n");
 
+    // The stored setting is still accepted (kept so the feature can be revived).
     const on = await api("/api/crm/org", { method: "PATCH", body: JSON.stringify({ voiceNudge: true }) }, cookie);
     expect(on.status).toBe(200);
 
     try {
       const cust1 = await makeCustomer();
       const est1 = await makeEstimate(cust1.id);
-      // Snapshot every candidate before the send; afterwards, follow the file
-      // the server actually appended to (it may not exist until the first call).
-      const beforeByPath = new Map(
-        candidates.filter((p) => fs.existsSync(p)).map((p) => [p, fs.readFileSync(p, "utf8")]),
-      );
       const send1 = await api(`/api/crm/estimates/${est1.id}/send`, { method: "POST", body: "{}" }, cookie);
       expect(send1.status).toBe(200);
-      outboxPath =
-        candidates.find((p) => fs.existsSync(p) && fs.readFileSync(p, "utf8") !== (beforeByPath.get(p) ?? "")) ??
-        outboxPath;
-      const before = beforeByPath.get(outboxPath) ?? "";
-      const digits1 = cust1.phone.replace(/\D/g, "").slice(-10);
-      await poll(async () => readOutbox(), (o) => o !== before && o.includes(digits1));
-      expect(readOutbox()).toContain("check your email inbox or spam folder");
-
-      const off = await api("/api/crm/org", { method: "PATCH", body: JSON.stringify({ voiceNudge: false }) }, cookie);
-      expect(off.status).toBe(200);
-      const cust2 = await makeCustomer();
-      const est2 = await makeEstimate(cust2.id);
-      const beforeOff = readOutbox();
-      const send2 = await api(`/api/crm/estimates/${est2.id}/send`, { method: "POST", body: "{}" }, cookie);
-      expect(send2.status).toBe(200);
       await sleep(1500); // give a fire-and-forget call time to (not) happen
-      const phone2digits = cust2.phone.replace(/\D/g, "").slice(-10);
-      expect(readOutbox().slice(beforeOff.length)).not.toContain(phone2digits);
+      const digits1 = cust1.phone.replace(/\D/g, "").slice(-10);
+      expect(readAll()).not.toContain(digits1);
     } finally {
       await api("/api/crm/org", { method: "PATCH", body: JSON.stringify({ voiceNudge: false }) }, cookie);
     }

@@ -7,6 +7,7 @@
  * the signed email link, the next-day follow-up and the close.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { gsmSafeText } from "../crm/sms-segments";
 import pg from "pg";
 import fs from "node:fs";
 import path from "node:path";
@@ -210,7 +211,7 @@ describe("raising and reminding (real DB)", () => {
         expect(accepted).toEqual([]);
       } else {
         await retry(); // even a stale in-memory call cannot repeat the accepted revision
-        expect(accepted).toEqual([revision.body]);
+        expect(accepted).toEqual([gsmSafeText(revision.body)]); // texts go out with plain punctuation (sms.ts)
         expect((await escRow(initial.escalationId!)).last_error).toBeNull();
         const receipt = ((await callRow(c.id))!.flags as any).escalationDetailsDelivery[String(initial.escalationId)];
         expect(receipt).toMatchObject({ revision: revision.revision, status: "sent", error: null });
@@ -278,7 +279,7 @@ describe("raising and reminding (real DB)", () => {
     const r1 = await tick("2026-10-01T11:00:00");
     expect(r1.reminded).toBeGreaterThanOrEqual(1);
     expect(await escRow(id!)).toMatchObject({ sent_count: 2 });
-    expect(smsTo(lead).at(-1).body).toMatch(/^REMINDER #1 — still waiting on your OK/);
+    expect(smsTo(lead).at(-1).body).toMatch(/^REMINDER #1 - still waiting on your OK/);
     await tick("2026-10-01T21:30:00"); // due, but after 20:00 local
     expect((await escRow(id!)).sent_count).toBe(2);
     await tick("2026-10-02T08:05:00"); // window opens

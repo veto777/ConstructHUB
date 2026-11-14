@@ -58,3 +58,22 @@ export function squareDrawToTotal(lines: InvoiceSourceLine[], taxRateBps: number
   }
   biggest.unitPriceCents = best.price;
 }
+
+/** What a deposit still holds after any refund: the amount an invoice may be credited with. */
+export function depositNetCents(p: { amountCents: number; refundedCents?: number | null }): number {
+  return Math.max(0, p.amountCents - Math.max(0, Number(p.refundedCents ?? 0) || 0));
+}
+
+/**
+ * A dollar-amount draw typed in "Take a payment" is BEFORE tax (the dialog says so, and the amount is put on the
+ * pre-tax lines). So its cap and the share of the job it records are measured against the signed amount before
+ * tax, never the tax-inclusive total: $5,500 on a $10,000 job at 10% tax is 55% (a $6,050 invoice), not 50%.
+ */
+export function dollarDrawShare(
+  amountCents: number,
+  approval: { subtotalCents: number; lineDiscountCents: number; optionalDiscountCents: number },
+): { preTaxCents: number; bps: number } | { preTaxCents: number; over: true } {
+  const preTaxCents = Math.max(0, approval.subtotalCents - approval.lineDiscountCents - approval.optionalDiscountCents);
+  if (preTaxCents <= 0 || amountCents > preTaxCents) return { preTaxCents, over: true };
+  return { preTaxCents, bps: Math.max(1, Math.min(10000, Math.round((amountCents * 10000) / preTaxCents))) };
+}

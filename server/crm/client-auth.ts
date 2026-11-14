@@ -64,8 +64,10 @@ function parseCookies(req: any): Record<string, string> {
   return out;
 }
 
+// Same rule as lead-capture.ts: the left-most X-Forwarded-For is whatever the
+// sender wrote, so it is never trusted (req.ip already honours "trust proxy").
 const clientIp = (req: any) =>
-  String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
+  String(req.headers["cf-connecting-ip"] || req.ip || "")
     .split(",")[0].trim().slice(0, 60);
 
 // ── Rate limiting ───────────────────────────────────────────────────────────
@@ -572,7 +574,8 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       punchLists: await punchListsForCustomers(client.customerIds),
       estimates: estimates.map((e) => ({
         id: e.id, number: e.number, title: e.title, status: e.status,
-        totalCents: e.totalCents, sentAt: e.sentAt, expiresAt: e.expiresAt,
+        // A signed estimate reads for what was signed (options and discounts picked at approval).
+        totalCents: e.approvedAt ? (e.approvedTotalCents ?? e.totalCents) : e.totalCents, sentAt: e.sentAt, expiresAt: e.expiresAt,
         approvedAt: e.approvedAt, declinedAt: e.declinedAt,
         orgName: orgName.get(e.orgId) ?? null,
         link: `/e/${e.publicToken}`,
@@ -599,7 +602,7 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       contracts: estimates
         .filter((e) => e.approvedAt)
         .map((e) => ({
-          id: e.id, number: e.number, title: e.title, totalCents: e.totalCents,
+          id: e.id, number: e.number, title: e.title, totalCents: e.approvedTotalCents ?? e.totalCents,
           signedName: e.signatureName, signedAt: e.approvedAt,
           orgName: orgName.get(e.orgId) ?? null,
           link: `/e/${e.publicToken}`,

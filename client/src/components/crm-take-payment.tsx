@@ -70,6 +70,17 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cry
 /** "Received on" as an ISO instant at local noon; an emptied field means today. */
 const receivedAtIso = (day: string) => { const d = new Date(`${day || todayLocal()}T12:00:00`); return (Number.isNaN(d.getTime()) ? new Date() : d).toISOString(); };
 
+/** Files a photo or copy of a check on the client's record; answers the attachment id to send with the payment. */
+export async function uploadPaymentProof(customerId: string, file: File): Promise<string | null> {
+  const fd = new FormData();
+  fd.append("kind", "payment_proof");
+  fd.append("refId", customerId);
+  fd.append("file", file);
+  const r = await fetch("/api/crm/attachments", { method: "POST", body: fd, credentials: "include" });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "The photo didn't upload");
+  return (await r.json())?.id ?? null;
+}
+
 /** The signed total an approved estimate reads for (what the server bills against). */
 const signedTotalCents = (e: any): number => Number(e.approvedTotalCents ?? e.totalCents ?? 0) || 0;
 
@@ -224,6 +235,8 @@ export function TakePaymentDialog({
     onSuccess: (r: any) => {
       toast({ title: `${r?.number ?? "Invoice"} created`, description: `${money(r?.totalCents)} — take the payment below.` });
       if (r?.id) setInvoiceId(r.id);
+      // The server replays a repeated key (a retry never bills twice), so the next invoice needs a fresh one.
+      setIdem(uid());
       setNewInvOpen(false);
       setNewInv((f) => ({ ...f, percent: "", amount: "", discount: "", title: "" }));
       onChanged?.();
@@ -236,13 +249,27 @@ export function TakePaymentDialog({
     : newInvPreview.draw >= 100 && newInvPreview.total > 0 && !!customerId;
 
   // ── Manual: an invoice payment already in hand ───────────────────────────
+  // The photo or copy of the check (Settings may require one for check and cash).
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const proofFileRef = useRef<HTMLInputElement>(null);
+  const [uploadingInvoiceProof, setUploadingInvoiceProof] = useState(false);
+  const invoiceNeedsPhoto = photoRule === "required" && (method === "check" || method === "cash");
+  useEffect(() => { if (open) setProofFile(null); }, [open]);
   const recordManual = useMutation({
-    mutationFn: async () =>
-      (await apiRequest("POST", `/api/crm/invoices/${inv.id}/payments`, {
+    mutationFn: async () => {
+      let proofAttachmentId: string | null = null;
+      if (proofFile && customerId) {
+        setUploadingInvoiceProof(true);
+        try { proofAttachmentId = await uploadPaymentProof(customerId, proofFile); }
+        finally { setUploadingInvoiceProof(false); }
+      }
+      return (await apiRequest("POST", `/api/crm/invoices/${inv.id}/payments`, {
         amountCents,
         method,
         note: note || null,
-      }, { headers: { "Idempotency-Key": `${idem}:${inv.id}` } })).json(),
+        ...(proofAttachmentId ? { proofAttachmentId } : {}),
+      }, { headers: { "Idempotency-Key": `${idem}:${inv.id}` } })).json();
+    },
     onSuccess: (r: any) => {
       // Only promise the receipt the server says it is sending.
       const receipt = r?.receiptQueued
@@ -415,7 +442,9 @@ export function TakePaymentDialog({
         <span className="text-muted-foreground tabular-nums" data-testid="text-new-invoice-preview">
           {newInvPreview.disc > 0 ? <>{money(newInvPreview.draw)} − {money(newInvPreview.disc)} discount = </> : null}
           <strong className="text-foreground">{money(newInvPreview.total)}</strong>{sourceEstimate && newInv.mode !== "full" ? ` of ${money(newInvPreview.base)} signed` : ""}
-          {sourceEstimate && (sourceEstimate.taxRateBps ?? 0) > 0 ? " before tax" : ""}
+          {/* Only a typed dollar amount is before tax (the server adds tax on top and caps it at the signed amount
+              before tax); a percentage or the full amount is a share of the signed total, tax included. */}
+          {sourceEstimate && newInv.mode === "amount" && (sourceEstimate.taxRateBps ?? 0) > 0 ? " (tax included). The amount you typed is before tax; tax is added on the invoice." : ""}
           {sourceEstimate && (payments ?? []).some((p) => p.estimateId === sourceEstimate.id && !p.invoiceId && DEPOSIT_TAKEN.includes(p.status)) ? " · the deposit already received is credited to this invoice" : ""}
         </span>
         <div className="flex gap-2">
@@ -668,6 +697,15 @@ export function TakePaymentDialog({
                 <Input id="take-note" value={note} onChange={(e) => setNote(e.target.value)}
                   placeholder="Check #1042" data-testid="input-take-note" />
               </div>
+              {photoRule !== "off" && customerId && (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="flex items-center gap-1.5"><Camera className="h-3.5 w-3.5" /> Photo or copy of the check{invoiceNeedsPhoto ? <span className="text-destructive"> *</span> : <span className="text-muted-foreground"> (optional)</span>}
+                    {proofFile && <span className="truncate max-w-[10rem] text-muted-foreground" data-testid="text-take-photo-name">· {proofFile.name}</span>}</span>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => proofFileRef.current?.click()} data-testid="button-take-photo">{proofFile ? "Change" : "Add"}</Button>
+                  <input ref={proofFileRef} type="file" accept="image/*,application/pdf" capture="environment" className="hidden"
+                    onChange={(ev) => setProofFile(ev.target.files?.[0] ?? null)} data-testid="input-take-photo" />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -681,8 +719,8 @@ export function TakePaymentDialog({
                 confirmLabel: "Yes, record it", destructive: false,
                 onConfirm: () => recordManual.mutate(),
               })}
-              disabled={amountCents < 1 || !method || recordManual.isPending}
-              title={!method ? "Pick the payment type first" : undefined}
+              disabled={amountCents < 1 || !method || recordManual.isPending || uploadingInvoiceProof || (invoiceNeedsPhoto && !proofFile)}
+              title={!method ? "Pick the payment type first" : invoiceNeedsPhoto && !proofFile ? "Add a photo or copy of the check first" : undefined}
               data-testid="button-record-manual-payment">
               {recordManual.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Record {amountCents >= 1 ? money(amountCents) : "payment"}

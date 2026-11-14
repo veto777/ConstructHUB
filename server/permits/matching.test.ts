@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  digestUndelivered,
   normalizeAddress, addressesMatch, streetKey, contractorMatches, matchedTrades, haversineMiles, matchWatch, contentHash, normalizeParcel,
 } from "./matching";
 import type { PermitRecord } from "../scrapers/types";
@@ -82,5 +83,18 @@ describe("matchWatch", () => {
     const a = permit({ status: "Issued" });
     expect(contentHash(a)).toBe(contentHash({ ...a, raw: { x: 1 } }));
     expect(contentHash(a)).not.toBe(contentHash({ ...a, status: "Finaled" }));
+  });
+});
+
+// Audit 08 #8: a digest whose every channel failed was stamped as notified and never sent again.
+describe("digestUndelivered", () => {
+  it("is true only when channels were tried and none succeeded", () => {
+    expect(digestUndelivered({ email: { ok: false } })).toBe(true);
+    expect(digestUndelivered({ email: { ok: false }, sms: { ok: false } })).toBe(true);
+    expect(digestUndelivered({ email: { ok: false }, sms: { ok: true } })).toBe(false);
+    expect(digestUndelivered({ email: { ok: true } })).toBe(false);
+    // No channel switched on: nothing to retry.
+    expect(digestUndelivered({})).toBe(false);
+    expect(digestUndelivered(null)).toBe(false);
   });
 });

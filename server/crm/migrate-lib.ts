@@ -87,7 +87,16 @@ export function parseCsv(text: string): ParsedCsv {
   const nonEmpty = records.filter((r) => r.some((cell) => cell.trim() !== ""));
   if (!nonEmpty.length) return { headers: [], rows: [] };
 
-  const headers = nonEmpty[0].map((h) => h.trim());
+  // A blank header ("Name,Email,") gets a name, and a repeated one a suffix:
+  // the mapping step keys columns by header text, so an empty or duplicate
+  // name cannot be picked (and an empty option value crashes the picker).
+  const seen = new Map<string, number>();
+  const headers = nonEmpty[0].map((h, i) => {
+    const base = h.trim() || `Column ${i + 1}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? base : `${base} (${n})`;
+  });
   const rows = nonEmpty.slice(1).map((r) => {
     const out = r.slice(0, headers.length);
     while (out.length < headers.length) out.push("");
@@ -142,6 +151,16 @@ export const MIGRATE_FIELDS: Record<MigrateEntity, MigrateField[]> = {
   ],
 };
 
+/**
+ * The digits a phone is deduped on, or null when it is not a real number.
+ * "N/A", "-" and "call office" strip to nothing, and nothing equals the
+ * stripped phone of every other client without a number.
+ */
+export function dedupePhoneDigits(phone?: string | null): string | null {
+  const d = String(phone ?? "").replace(/\D/g, "");
+  return d.length >= 7 ? d : null;
+}
+
 /** Normalize a header for matching: lowercase, collapse whitespace/punctuation. */
 function normHeader(h: string): string {
   return h.toLowerCase().replace(/[_\-./()]+/g, " ").replace(/\s+/g, " ").trim();
@@ -177,7 +196,10 @@ export function guessMapping(entity: MigrateEntity, headers: string[]): Record<s
     const aliases = f.aliases.map(normHeader);
     const candidates = normed
       .map((h, i) => ({ h, i }))
-      .filter(({ h, i }) => !used.has(i) && aliases.some((a) => h.startsWith(a) || a.startsWith(h)));
+      // Two-letter aliases ("st") and two-letter headers match exactly or not
+      // at all: as a prefix "st" claimed "Status" and "Start Date" for State.
+      .filter(({ h, i }) => !used.has(i) && aliases.some((a) =>
+        (a.length >= 3 && h.startsWith(a)) || (h.length >= 3 && a.startsWith(h))));
     if (candidates.length === 1) {
       used.add(candidates[0].i);
       mapping[f.key] = headers[candidates[0].i];

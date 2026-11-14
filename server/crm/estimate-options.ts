@@ -35,6 +35,7 @@ import { estimateDefaultsFromOrg } from "./doc-defaults";
 import { resolveEstimateTaxRate, taxSourceRecord } from "./tax";
 import { logActivity } from "./activity";
 import { recordPricebookUsage } from "./pricebook-usage";
+import { priceFloorViolation } from "./price-floor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -193,6 +194,12 @@ export function registerEstimateOptionRoutes(app: Express, getDevUser: GetUser):
     const est = await loadEst(ctx, req.params.id);
     if (!est) return res.status(404).json({ message: "Estimate not found" });
     if (!editGuard(est, res)) return;
+    // Price-floor lock: an option's lines become a signable estimate when the client picks it, so they are held
+    // to the same floor as the estimate's own lines (entities.ts). Non-owners only; the owner is exempt.
+    for (const o of parsed.data.options) {
+      const floorMsg = await priceFloorViolation(ctx, o.items);
+      if (floorMsg) return res.status(422).json({ message: floorMsg });
+    }
     const existing = await db.select().from(crmEstimateOptions)
       .where(and(eq(crmEstimateOptions.orgId, ctx.org.id), eq(crmEstimateOptions.estimateId, est.id)));
     // Every row this route wrote is managed, an empty new tab included (items = []); only legacy

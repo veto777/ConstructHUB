@@ -318,7 +318,7 @@ const memberPatchSchema = z.object({
   status: z.enum(["active", "disabled"]).optional(),
   displayName: z.string().max(120).nullable().optional(),
   title: z.string().max(120).nullable().optional(),
-  phone: z.string().max(40).nullable().optional(),
+  phone: memberPhoneSchema,
   calendarColor: z.string().max(20).nullable().optional(),
   hourlyCostCents: z.number().int().min(0).max(100_000_00).nullable().optional(),
   divisionId: z.string().max(64).nullable().optional(),
@@ -383,14 +383,17 @@ function presentMember(m: typeof crmMembers.$inferSelect, canSeeCosts: boolean) 
   };
 }
 
+const escHtml = (s?: string | null) =>
+  String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
+
 /** Shared invite email — create and resend must send the same mail. */
 async function sendInviteEmail(orgName: string, email: string, link: string): Promise<boolean> {
   try {
     await sendWithFallback({
       to: email,
-      subject: `You've been invited to join ${orgName} on ConstructHub CRM`,
+      subject: `You've been invited to join ${orgName.replace(/[\r\n]+/g, " ")} on ConstructHub CRM`,
       html: `
-        <p>${orgName} has invited you to join their team on ConstructHub CRM.</p>
+        <p>${escHtml(orgName)} has invited you to join their team on ConstructHub CRM.</p>
         <p><a href="${link}">Accept the invitation</a></p>
         <p>This link expires in 14 days. If you weren't expecting it, you can ignore this email.</p>
       `,
@@ -838,11 +841,29 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
             return base;
           })()
         : undefined;
+    // Written as ONE atomic jsonb merge of only the top-level keys this
+    // request changed (same idiom as writeHoverConn / stampBackup): writing the
+    // whole request-start snapshot back would undo a concurrent HOVER token
+    // rotation, backup stamp or document-number high-water mark.
+    const customFieldsSql = mergedCustomFields
+      ? (() => {
+          const before = ((ctx.org.customFields as Record<string, unknown> | null) ?? {});
+          const changed: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(mergedCustomFields)) {
+            if (JSON.stringify(v) !== JSON.stringify(before[k])) changed[k] = v;
+          }
+          let expr = sql`(coalesce(${crmOrgs.customFields}, '{}'::jsonb) || ${JSON.stringify(changed)}::jsonb)`;
+          for (const k of Object.keys(before)) {
+            if (!(k in mergedCustomFields)) expr = sql`(${expr} - ${k}::text)`;
+          }
+          return expr;
+        })()
+      : undefined;
     const [row] = await db
       .update(crmOrgs)
       .set({
         ...profile,
-        ...(mergedCustomFields ? { customFields: mergedCustomFields } : {}),
+        ...(customFieldsSql ? { customFields: customFieldsSql } : {}),
         updatedAt: new Date(),
       })
       .where(eq(crmOrgs.id, ctx.org.id))
@@ -927,6 +948,11 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (parsed.data.role === "owner" && ctx.member.role !== "owner") {
       return res.status(403).json({ message: "Only an owner can grant the owner role" });
     }
+    // ...and only an owner may take the owner role away or disable an owner.
+    if (target.role === "owner" && ctx.member.role !== "owner"
+      && (parsed.data.role !== undefined || parsed.data.status !== undefined || parsed.data.permissions !== undefined)) {
+      return res.status(403).json({ message: "Only an owner can change another owner's access" });
+    }
     // The pm role sees the whole book of work — only owner/admin hand it out,
     // never a delegate who merely holds manageTeam via an override.
     if (parsed.data.role === "pm" && ctx.member.role !== "owner" && ctx.member.role !== "admin") {
@@ -934,7 +960,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     }
     // A delegate who holds "Manage team" only through an override never makes
     // a seat (their own included) more powerful than the one they hold.
-    if (parsed.data.role !== undefined || parsed.data.permissions !== undefined || parsed.data.status !== undefined) {
+    // The division pin is covered too: confining a seat above your own is a change to it.
+    if (parsed.data.role !== undefined || parsed.data.permissions !== undefined || parsed.data.status !== undefined
+      || (parsed.data.divisionId !== undefined && target.id !== ctx.member.id)) {
       const lacking = grantExceedsOwn(
         ctx, parsed.data.role ?? target.role,
         parsed.data.permissions !== undefined ? parsed.data.permissions : target.permissions,
@@ -1025,6 +1053,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!target) return res.status(404).json({ message: "Member not found" });
     if (target.userId === ctx.org.ownerUserId) {
       return res.status(400).json({ message: "The owner cannot be removed. Transfer ownership first." });
+    }
+    if (target.role === "owner" && ctx.member.role !== "owner") {
+      return res.status(403).json({ message: "Only an owner can remove another owner" });
     }
     // A delegate never removes a seat that holds more access than their own.
     const above = grantExceedsOwn(ctx, target.role, target.permissions);
@@ -1210,7 +1241,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       if (existing.length) {
         await tx
           .update(crmMembers)
-          .set({ status: "invited", role, permissions: permissions ?? null, displayName: displayName ?? null, divisionId: divisionId ?? null, updatedAt: new Date() })
+          .set({ status: "invited", role, permissions: permissions ?? null, displayName: displayName ?? existing[0].displayName ?? null, divisionId: divisionId ?? null, updatedAt: new Date() })
           .where(eq(crmMembers.id, existing[0].id));
       } else {
         await tx.insert(crmMembers).values({
@@ -1313,9 +1344,22 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!invite) return res.status(404).json({ message: "Invitation not found" });
 
     await db.update(crmInvitations).set({ revokedAt: new Date() }).where(eq(crmInvitations.id, invite.id));
-    // Release the held seat.
+    // Release the held seat. Only a placeholder that never had an account is
+    // deleted; a re-invited former member's row goes back to disabled, because
+    // their jobs, notes and time entries still point at it.
     await db
       .delete(crmMembers)
+      .where(
+        and(
+          eq(crmMembers.orgId, ctx.org.id),
+          sql`lower(${crmMembers.email}) = ${invite.email.toLowerCase()}`,
+          eq(crmMembers.status, "invited"),
+          isNull(crmMembers.userId),
+        ),
+      );
+    await db
+      .update(crmMembers)
+      .set({ status: "disabled", updatedAt: new Date() })
       .where(
         and(
           eq(crmMembers.orgId, ctx.org.id),
@@ -1416,7 +1460,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
           status: "active",
           displayName: placeholder.displayName ?? account?.displayName ?? null,
           avatarUrl: account?.avatarUrl ?? null,
-          phone: phoneRaw || (placeholder as any).phone || null,
+          phone: (phoneRaw && (normalizePhone(phoneRaw) ?? phoneRaw)) || (placeholder as any).phone || null,
           updatedAt: new Date(),
         })
         .where(eq(crmMembers.id, placeholder.id));
@@ -1430,7 +1474,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         permissions: invite.permissions ?? null,
         divisionId: invite.divisionId ?? null,
         displayName: account?.displayName ?? null,
-        phone: phoneRaw || null,
+        phone: (phoneRaw && (normalizePhone(phoneRaw) ?? phoneRaw)) || null,
         avatarUrl: account?.avatarUrl ?? null,
       });
     }

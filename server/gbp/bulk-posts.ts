@@ -161,11 +161,33 @@ export function dropboxZipUrl(raw: string): string {
   u.protocol = 'https:'; u.searchParams.set('dl', '1');
   return u.toString();
 }
+/** A response body read up to a byte cap: the declared length is checked first, then the stream is counted and
+ * dropped the moment it passes the cap, so an oversized download is never held in memory. */
+export async function readCapped(r: Response, max: number, tooBig: string): Promise<Buffer> {
+  const over = () => new GoogleError('invalid', tooBig, 400);
+  if (Number(r.headers.get('content-length') || 0) > max) throw over();
+  if (!r.body) {
+    const all = Buffer.from(await r.arrayBuffer());
+    if (all.length > max) throw over();
+    return all;
+  }
+  const reader = r.body.getReader(), chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > max) { await reader.cancel().catch(() => undefined); throw over(); }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
 async function downloadDropboxZip(url: string, http: Fetch = fetch): Promise<{ name: string; bytes: Buffer }[]> {
   const r = await http(url, { redirect: 'follow', signal: AbortSignal.timeout(600000), headers: { 'user-agent': 'Mozilla/5.0 (compatible; ConstructHUB bulk posts)' } });
+  // A link that is gone or private will not start working by itself: the run ends with the reason (kind 'invalid').
+  if (r.status === 400 || r.status === 403 || r.status === 404 || r.status === 410) throw new GoogleError('invalid', 'Dropbox could not open that link. Check that anyone with the link can view the folder, then start a new run.', 400);
   if (!r.ok) throw new Error(`Dropbox answered ${r.status}`);
-  const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length > MAX_ZIP_BYTES) throw new Error('The Dropbox folder is over 400 MB; split it into smaller folders');
+  const buf = await readCapped(r, MAX_ZIP_BYTES, 'The Dropbox folder is over 400 MB; split it into smaller folders');
   const type = r.headers.get('content-type') || '';
   // A link to one image downloads the image itself.
   if (/^image\//.test(type)) return [{ name: 'photo.jpg', bytes: buf }];
@@ -235,7 +257,14 @@ export async function listRuns(user: number, location: number) {
 export async function setRunStatus(user: number, location: number, id: number, action: 'pause' | 'resume' | 'cancel') {
   const { rows: [run] } = await pool.query('SELECT * FROM gbp_bulk_posts WHERE id=$1 AND user_id=$2 AND location_id=$3', [id, user, location]);
   if (!run) throw new GoogleError('invalid', 'Run not found', 404);
-  if (action === 'pause' && ['active', 'importing'].includes(run.status)) await pool.query("UPDATE gbp_bulk_posts SET status='paused',updated_at=now() WHERE id=$1", [id]);
+  if (action === 'pause' && ['active', 'importing'].includes(run.status)) {
+    await pool.query("UPDATE gbp_bulk_posts SET status='paused',updated_at=now() WHERE id=$1", [id]);
+    // "Nothing posts if you pause": posts already handed to the content queue (up to 36 hours ahead) are taken
+    // back out and wait as pending again, with a new request key so resume can queue them afresh.
+    await pool.query(`WITH taken AS (UPDATE gbp_content_jobs j SET status='cancelled' FROM gbp_bulk_post_items i
+        WHERE i.run_id=$1 AND i.status='queued' AND i.job_id=j.id AND j.status='queued' RETURNING j.id)
+      UPDATE gbp_bulk_post_items i SET status='pending',job_id=NULL,request_key=gen_random_uuid() FROM taken WHERE i.run_id=$1 AND i.job_id=taken.id`, [id]);
+  }
   if (action === 'resume' && run.status === 'paused') {
     const { rows: pending } = await pool.query("SELECT id FROM gbp_bulk_post_items WHERE run_id=$1 AND status='pending' ORDER BY position", [id]);
     const today = new Date().toISOString().slice(0, 10);
@@ -277,7 +306,7 @@ async function importTick(run: any, http: Fetch) {
     }
   } else if (run.source === 'dropbox') {
     const files = await downloadDropboxZip(ref.url, http);
-    if (!files.length) throw new Error('No JPEG, PNG or WebP photos in that Dropbox folder');
+    if (!files.length) throw new GoogleError('invalid', 'No JPEG, PNG or WebP photos in that Dropbox folder', 400);
     total = files.length;
     await pool.query('UPDATE gbp_bulk_posts SET total=$2 WHERE id=$1', [run.id, total]);
     for (const f of files) {
@@ -331,7 +360,10 @@ export async function runBulkPostsWorker(ai: DraftAI = generateDraft, http: Fetc
     for (const run of importing) {
       try { await importTick(run, http); }
       catch (e: any) {
-        await c.query('UPDATE gbp_bulk_posts SET error=$2,updated_at=now() WHERE id=$1', [run.id, String(e?.message || e).slice(0, 300)]);
+        // A problem that will not fix itself (folder too big, no photos, link gone) ends the run with the reason
+        // instead of downloading the same folder again every tick; anything else is tried again.
+        const fatal = e instanceof GoogleError && e.kind === 'invalid';
+        await c.query(`UPDATE gbp_bulk_posts SET error=$2,updated_at=now()${fatal ? ",status='done'" : ''} WHERE id=$1`, [run.id, String(e?.message || e).slice(0, 300)]);
         void recordFailure('job', 'Bulk posts import', e, { runId: run.id }, 'warning');
       }
     }
@@ -340,14 +372,16 @@ export async function runBulkPostsWorker(ai: DraftAI = generateDraft, http: Fetc
     for (const item of due) {
       try { await queueItem({ id: item.run_id, user_id: item.user_id, location_id: item.location_id, instructions: item.instructions }, item, ai); }
       catch (e: any) {
-        const quota = e instanceof GoogleError && e.kind === 'quota';
+        // Out of budget, or the writer is busy for a moment: the item waits and is tried on the next tick. A busy
+        // writer only fails the item once its time has passed.
+        const quota = e instanceof GoogleError && (e.kind === 'quota' || (e.kind === 'transient' && new Date(item.due_at).getTime() > Date.now()));
         await c.query(quota ? 'UPDATE gbp_bulk_post_items SET error=$2 WHERE id=$1' : "UPDATE gbp_bulk_post_items SET status='failed',error=$2 WHERE id=$1", [item.id, String(e?.message || e).slice(0, 300)]);
         if (!quota) void recordFailure('job', 'Bulk posts caption', e, { itemId: item.id }, 'warning');
       }
     }
     // What the content queue did with the queued posts.
-    await c.query(`UPDATE gbp_bulk_post_items i SET status=CASE WHEN j.status='published' THEN 'published' WHEN j.status IN ('failed','cancelled') THEN 'failed' ELSE i.status END, error=COALESCE(j.error,i.error)
-      FROM gbp_content_jobs j WHERE i.job_id=j.id AND i.status='queued' AND j.status IN ('published','failed','cancelled')`);
+    await c.query(`UPDATE gbp_bulk_post_items i SET status=CASE WHEN j.status='published' THEN 'published' WHEN j.status IN ('failed','cancelled','rejected','uncertain') THEN 'failed' ELSE i.status END, error=COALESCE(j.error,i.error)
+      FROM gbp_content_jobs j WHERE i.job_id=j.id AND i.status='queued' AND j.status IN ('published','failed','cancelled','rejected','uncertain')`);
     await c.query(`UPDATE gbp_bulk_posts r SET status='done',updated_at=now() WHERE r.status='active' AND r.total>0 AND r.imported>=r.total
       AND NOT EXISTS (SELECT 1 FROM gbp_bulk_post_items i WHERE i.run_id=r.id AND i.status IN ('pending','queued'))`);
   } finally {

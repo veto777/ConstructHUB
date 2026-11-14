@@ -402,6 +402,8 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
       return res.status(400).json({ message: "Attach a report file or paste the report text." });
     }
 
+    // Postgres text and jsonb cannot hold NUL; some PDF strings carry it.
+    text = text.replace(/\u0000/g, "");
     if (!text.trim()) return res.status(400).json({ message: "The report is empty." });
 
     const parsed = parseMeasurementReport(text);
@@ -444,11 +446,11 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
             .status(err.code === "LIMIT_FILE_SIZE" ? 413 : 400)
             .json({ message: err.code === "LIMIT_FILE_SIZE" ? "Report is over the 25MB limit." : "Upload failed." });
         }
-        void uploadHandler(req, res);
+        uploadHandler(req, res).catch(next);
       });
       return;
     }
-    void uploadHandler(req, res);
+    uploadHandler(req, res).catch(next);
   });
 
   /**
@@ -486,6 +488,9 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
       customer = c;
     } else {
       customer = await matchCustomer(ctx.org.id, parsed.contact.email, parsed.contact.phone);
+      // A match this seat cannot open (another division, not their client) is
+      // not handed back or linked: the report would vanish from their own list.
+      if (customer && !(await objectPolicy(ctx).visible("customers", customer.id))) customer = null;
       if (!customer) {
         customer = await createCustomer(ctx.org.id, ctx.member.id, parsed.contact, divisionScopeOf(ctx));
         created = true;

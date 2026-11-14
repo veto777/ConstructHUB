@@ -114,6 +114,11 @@ export function spelledOutEmails(text: string): string[] {
   return [...text.matchAll(SPELLED)].map((m) => `${m[1]}@${m[2].replace(/\s*[[({]\s*dot\s*[\])}]\s*/gi, ".")}`.toLowerCase());
 }
 
+/** decodeURIComponent that never throws: a stray "%" in a path ("/100%-financing") is read as written. */
+export function safeDecode(v: string): string {
+  try { return decodeURIComponent(v); } catch { return v; }
+}
+
 /**
  * Emails published on the page: mailto: links, plain text, Cloudflare-protected and spelled-out addresses. Only addresses on
  * the site's own domain or a mail provider are kept.
@@ -121,7 +126,7 @@ export function spelledOutEmails(text: string): string[] {
 export function extractEmails($: cheerio.CheerioAPI, siteDomain: string): string[] {
   const found = new Set<string>();
   $("a[href^='mailto:' i]").each((_, a) => {
-    const v = decodeURIComponent(String($(a).attr("href") ?? "").replace(/^mailto:/i, "").split("?")[0]).trim().toLowerCase();
+    const v = safeDecode(String($(a).attr("href") ?? "").replace(/^mailto:/i, "").split("?")[0]).trim().toLowerCase();
     if (v) found.add(v);
   });
   $("[data-cfemail]").each((_, e) => { const v = decodeCfEmail(String($(e).attr("data-cfemail") ?? "")); if (v) found.add(v.toLowerCase()); });
@@ -192,11 +197,11 @@ export function analyzePage(page: { url: string; status: number; body: string })
     contactUrl,
     rel,
     // A user profile on a platform never speaks for the site, even when it says "guest posting".
-    submissionUrl: profilePage ? null : SUBMISSION_PAGE.test(`${heading} ${decodeURIComponent(path)}`) ? page.url : submissionLink,
-    directoryUrl: DIRECTORY_PAGE.test(`${heading} ${decodeURIComponent(path)}`) ? page.url : null,
+    submissionUrl: profilePage ? null : SUBMISSION_PAGE.test(`${heading} ${safeDecode(path)}`) ? page.url : submissionLink,
+    directoryUrl: DIRECTORY_PAGE.test(`${heading} ${safeDecode(path)}`) ? page.url : null,
     directoryLink,
     profilePage,
-    listPage: LIST_PAGE.find((l) => l.re.test(`${heading} ${decodeURIComponent(path)}`))?.why ?? null,
+    listPage: LIST_PAGE.find((l) => l.re.test(`${heading} ${safeDecode(path)}`))?.why ?? null,
   };
 }
 

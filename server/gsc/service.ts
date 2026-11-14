@@ -25,6 +25,10 @@ export async function gscToken(c: any, http: typeof fetch = fetch) {
   } catch {
     throw new ProviderError("Search Console token refresh unavailable");
   }
+  // Only Google refusing the grant itself (400 invalid_grant / 401) means "reconnect". A 5xx or 429 from the
+  // token endpoint is Google being unavailable: the default 502 is retried by the worker.
+  if (!r.ok && ![400, 401].includes(r.status))
+    throw new ProviderError("Search Console token refresh unavailable");
   if (
     !r.ok ||
     !t.access_token ||

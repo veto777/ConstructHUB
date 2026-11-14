@@ -32,8 +32,8 @@ import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMa
 import { requireCrmFeature, emitCrmEvent, queueCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { invoiceDefaultsFromOrg } from "./doc-defaults";
 import { autoSendPaymentReceipt } from "./receipts";
-import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent } from "./payment-guard";
-import { completeReconcileTasks } from "./payment-reconcile";
+import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent, OPEN_SESSION_WINDOW_MIN } from "./payment-guard";
+import { completeReconcileTasks, clearingCents } from "./payment-reconcile";
 import { receiptSettingsOf, reconcileSettingsOf, MANUAL_PAYMENT_METHOD_VALUES } from "@shared/payment-settings";
 import { logActivity } from "./activity";
 import { loadActorDirectory } from "./actors";
@@ -43,7 +43,7 @@ import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
 import { getBaseUrl } from "../auth";
 import { computeApprovalTotals } from "./discounts";
-import { progressInvoiceItems, squareDrawToTotal } from "./invoice-math";
+import { progressInvoiceItems, squareDrawToTotal, depositNetCents, dollarDrawShare } from "./invoice-math";
 import { lockDocNumbers, nextDocNumber } from "./doc-number";
 import { objectPolicy } from "./object-access";
 import { suggestPermitOffices } from "./permit-suggest";
@@ -231,6 +231,11 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await ctxFor(req, res, "manageInvoices");
     if (!ctx) return;
     if (!requirePermission(res, ctx, "seePrices")) return; // an invoice or payment is an amount
+    // The dialog sends an Idempotency-Key: a double-click or a retry after a timeout replays the first invoice
+    // instead of creating a second one (server/crm/payment-guard.ts), as on the record-payment route.
+    const claim = claimIdempotent(req, ctx.org.id);
+    if (answerIdempotent(res, req, claim)) return;
+    const fail = (status: number, body: Record<string, unknown>) => { releaseIdempotent(req, ctx.org.id); return res.status(status).json(body); };
     const parsed = z.object({
       customerId: z.string().min(1),
       projectId: z.string().nullable().optional(),
@@ -242,20 +247,20 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       notes: z.string().max(8000).nullable().optional(),
       items: z.array(invItem).max(300).default([]),
     }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid invoice", issues: parsed.error.issues });
+    if (!parsed.success) return fail(400, { message: "Invalid invoice", issues: parsed.error.issues });
     const d = parsed.data;
     // A document's own org_id does not authorize its foreign-key targets.
     const [customer] = await db.select({ id: crmCustomers.id }).from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, d.customerId))).limit(1);
-    if (!customer) return res.status(400).json({ message: "Customer not found in this organization" });
+    if (!customer) return fail(400, { message: "Customer not found in this organization" });
     if (d.projectId && !(await ownProject(ctx.org.id, d.projectId))) {
-      return res.status(400).json({ message: "Project not found in this organization" });
+      return fail(400, { message: "Project not found in this organization" });
     }
     let fromEstimate: typeof crmEstimates.$inferSelect | null = null;
     if (d.estimateId) {
       const [estimate] = await db.select().from(crmEstimates)
         .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, d.estimateId))).limit(1);
-      if (!estimate) return res.status(400).json({ message: "Estimate not found in this organization" });
+      if (!estimate) return fail(400, { message: "Estimate not found in this organization" });
       fromEstimate = estimate;
     }
     // Number + insert in one transaction: the allocation lock is held until
@@ -280,7 +285,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number },
     });
-    res.status(201).json(await recalcInvoice(ctx.org.id, inv.id));
+    const body = await recalcInvoice(ctx.org.id, inv.id);
+    rememberIdempotent(req, ctx.org.id, 201, body);
+    res.status(201).json(body);
   });
 
   /** Turn an approved estimate into an invoice — the normal path. */
@@ -288,10 +295,15 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await ctxFor(req, res, "manageInvoices");
     if (!ctx) return;
     if (!requirePermission(res, ctx, "seePrices")) return; // an invoice or payment is an amount
+    // Same Idempotency-Key handling as the record-payment route: a retried "Create invoice" or "Request a
+    // payment" replays the first invoice, never a second draw and a second email.
+    const claim = claimIdempotent(req, ctx.org.id);
+    if (answerIdempotent(res, req, claim)) return;
+    const fail = (status: number, body: Record<string, unknown>) => { releaseIdempotent(req, ctx.org.id); return res.status(status).json(body); };
     const [est] = await db.select().from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
-    if (!est) return res.status(404).json({ message: "Estimate not found" });
-    if (!est.approvedAt) return res.status(409).json({ message: "Only an approved estimate can be invoiced." });
+    if (!est) return fail(404, { message: "Estimate not found" });
+    if (!est.approvedAt) return fail(409, { message: "Only an approved estimate can be invoiced." });
     // The draw: a percentage of the signed total (default all of it), OR a dollar amount (Take a payment: "bill
     // $5,000 now") which becomes the matching percentage so progress billing still adds up to 100%. An optional
     // discount (dollars or percent of this draw) rides as its own "Discount" line — never hidden in a unit price.
@@ -309,7 +321,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       /** What the request is for, for its label and the ledger: deposit, progress payment or the final balance. */
       requestKind: z.enum(["deposit", "progress", "final"]).optional(),
     }).safeParse(req.body ?? {});
-    if (!draw.success) return res.status(400).json({ message: "Invalid progress billing", issues: draw.error.issues });
+    if (!draw.success) return fail(400, { message: "Invalid progress billing", issues: draw.error.issues });
     const { retainageBps } = draw.data;
     const items = await db.select().from(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, est.id)))
@@ -322,11 +334,20 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const approval = computeApprovalTotals(items, est.taxRateBps ?? 0, selected);
     let pct = draw.data.percentBps ?? 10000;
     if (draw.data.amountCents != null) {
-      if (approval.totalCents <= 0) return res.status(400).json({ message: "This estimate has no signed total to bill against." });
+      if (approval.totalCents <= 0) return fail(400, { message: "This estimate has no signed total to bill against." });
       if (draw.data.amountCents > approval.totalCents) {
-        return res.status(400).json({ message: `The signed total is ${usd(approval.totalCents)} — bill that or less.` });
+        return fail(400, { message: `The signed total is ${usd(approval.totalCents)} — bill that or less.` });
       }
-      pct = Math.max(1, Math.min(10000, Math.round((draw.data.amountCents * 10000) / approval.totalCents)));
+      if (draw.data.amountIncludesTax) {
+        pct = Math.max(1, Math.min(10000, Math.round((draw.data.amountCents * 10000) / approval.totalCents)));
+      } else {
+        // Typed before tax: cap and share against the signed amount before tax (dollarDrawShare).
+        const share = dollarDrawShare(draw.data.amountCents, approval);
+        if ("over" in share) {
+          return fail(400, { message: `The signed total is ${usd(share.preTaxCents)} before tax. Bill that or less.` });
+        }
+        pct = share.bps;
+      }
     }
     // "Final balance" bills exactly what is left — the signed total less every live invoice on the estimate, tax
     // included — so basis-point rounding on earlier draws never leaves cents behind (or bills them twice).
@@ -337,7 +358,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       if (prior.length) {
         pct = Math.max(1, 10000 - estimateBilledBps(prior, approval.totalCents));
         finalTargetCents = Math.max(0, approval.totalCents - prior.reduce((sum, p) => sum + p.totalCents, 0));
-        if (finalTargetCents < 100) return res.status(409).json({ message: "Nothing is left to bill on this estimate." });
+        if (finalTargetCents < 100) return fail(409, { message: "Nothing is left to bill on this estimate." });
       }
     }
     const lines = progressInvoiceItems(items, pct, approval.optionalDiscountCents);
@@ -359,7 +380,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     }
     const discountCents = draw.data.discountCents ?? (draw.data.discountBps ? Math.round((drawCents * draw.data.discountBps) / 10000) : 0);
     if (discountCents > 0) {
-      if (discountCents >= drawCents) return res.status(400).json({ message: "The discount can't be the whole invoice." });
+      if (discountCents >= drawCents) return fail(400, { message: "The discount can't be the whole invoice." });
       lines.push({
         kind: "discount", name: (draw.data.discountLabel?.trim() || "Discount").slice(0, 120),
         description: draw.data.discountBps ? `${draw.data.discountBps / 100}% off this invoice.` : null,
@@ -425,14 +446,19 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const tax = Math.round((Math.max(0, taxable - discount) * (est.taxRateBps || 0)) / 10000);
       const gross = Math.max(0, subtotal - discount + tax);
       const dueNow = gross - Math.round((gross * (retainageBps || 0)) / 10000);
-      const deposits = await tx.select().from(crmPayments).where(and(
+      // refunded_cents lives only in the database (payment-ledger-schema.ts), not on the Drizzle table, so it is
+      // read explicitly: a partly refunded deposit is credited at what is still held, never at its gross amount.
+      const deposits = await tx.select({
+        id: crmPayments.id, amountCents: crmPayments.amountCents, projectId: crmPayments.projectId,
+        refundedCents: sql<number>`coalesce(refunded_cents, 0)::int`,
+      }).from(crmPayments).where(and(
         eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.estimateId, est.id), isNull(crmPayments.invoiceId),
         inArray(crmPayments.status, ["succeeded", "partially_refunded"]),
       )).orderBy(asc(crmPayments.paidAt));
       let credited = 0;
       const creditedIds: string[] = [];
       for (const p of deposits) {
-        const net = Math.max(0, p.amountCents - Number((p as any).refundedCents ?? 0));
+        const net = depositNetCents(p);
         if (net <= 0 || credited + net > dueNow) continue;
         await tx.update(crmPayments).set({ invoiceId: row.id, projectId: p.projectId ?? row.projectId ?? null })
           .where(eq(crmPayments.id, p.id));
@@ -448,14 +474,16 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     });
     if (result.error) {
       const { status, ...body } = result.error;
-      return res.status(status).json(body);
+      return fail(status, body);
     }
     const { inv, credited } = result;
     logActivity(ctx, "invoice.created", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number, fromEstimate: est.number ?? est.id, ...(credited ? { depositCreditCents: credited } : {}) },
     });
-    res.status(201).json({ ...(await recalcInvoice(ctx.org.id, inv.id)), depositCreditCents: credited });
+    const body = { ...(await recalcInvoice(ctx.org.id, inv.id)), depositCreditCents: credited };
+    rememberIdempotent(req, ctx.org.id, 201, body);
+    res.status(201).json(body);
   });
 
   /**
@@ -497,6 +525,19 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
 
       const outstanding = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
       if (outstanding <= 0) return { error: { status: 409, message: "This invoice is already paid in full." } };
+      // A bank transfer still clearing is not on paidCents yet, but it is money on its way: recording the same
+      // balance again by hand would leave the invoice paid twice when the transfer settles.
+      const clearing = await clearingCents({ invoiceId: inv.id }, tx);
+      if (clearing > 0 && parsed.data.amountCents > outstanding - clearing) {
+        const room = Math.max(0, outstanding - clearing);
+        return { error: {
+          status: 409,
+          message: room > 0
+            ? `A ${usd(clearing)} bank transfer for this invoice is still clearing, so only ${usd(room)} more can be recorded until it settles.`
+            : `A ${usd(clearing)} bank transfer for this invoice is still clearing. It can take a few business days to settle, and nothing more can be recorded until it does.`,
+          outstandingCents: room,
+        } };
+      }
       if (parsed.data.amountCents > outstanding) {
         return { error: {
           status: 400,
@@ -668,6 +709,18 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (inv.voidedAt) return res.status(409).json({ message: "Already voided." });
     if ((inv.paidCents ?? 0) > 0) {
       return res.status(409).json({ message: "Payments have been recorded against this invoice; it can't be voided." });
+    }
+    // A payment in flight is not on paidCents yet: a bank transfer still clearing, or a checkout page the client
+    // may still finish. Voiding now would let that money land on a void invoice with nothing saying so.
+    if ((await clearingCents({ invoiceId: inv.id })) > 0) {
+      return res.status(409).json({ message: "A bank transfer for this invoice is still clearing. Wait for it to settle or fail before voiding the invoice." });
+    }
+    const [openCheckout] = await db.select({ id: crmPayments.id }).from(crmPayments).where(and(
+      eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.invoiceId, inv.id), eq(crmPayments.status, "pending"),
+      sql`${crmPayments.createdAt} >= now() - make_interval(mins => ${OPEN_SESSION_WINDOW_MIN})`,
+    )).limit(1);
+    if (openCheckout) {
+      return res.status(409).json({ message: "The client has a payment page open for this invoice right now. Wait for it to finish (or about half an hour) before voiding the invoice." });
     }
     const [row] = await db.update(crmInvoices).set({
       voidedAt: new Date(), status: "void", updatedAt: new Date(),
@@ -871,13 +924,25 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       phaseId: z.string().nullable().optional(), notes: z.string().max(2000).nullable().optional(),
     })).max(500) }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid budget", issues: parsed.error.issues });
-    await db.delete(crmBudgetLines)
-      .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.projectId, proj.id)));
-    if (parsed.data.lines.length) {
-      await db.insert(crmBudgetLines).values(parsed.data.lines.map((l) => ({
-        ...l, orgId: ctx.org.id, projectId: proj.id,
-      })) as any);
+    // Same reference check as the single-line routes, once per distinct pair.
+    const checked = new Set<string>();
+    for (const l of parsed.data.lines) {
+      const key = `${l.costCodeId}|${l.phaseId ?? ""}`;
+      if (checked.has(key)) continue;
+      checked.add(key);
+      const refErr = await budgetLineRefsError(ctx.org.id, proj.id, l.costCodeId, l.phaseId);
+      if (refErr) return res.status(400).json({ message: refErr });
     }
+    // One transaction: a failed insert must not leave the project with no budget.
+    await db.transaction(async (tx) => {
+      await tx.delete(crmBudgetLines)
+        .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.projectId, proj.id)));
+      if (parsed.data.lines.length) {
+        await tx.insert(crmBudgetLines).values(parsed.data.lines.map((l) => ({
+          ...l, orgId: ctx.org.id, projectId: proj.id,
+        })) as any);
+      }
+    });
     res.json({ ok: true, count: parsed.data.lines.length });
   });
 
@@ -1137,6 +1202,8 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (!org) return res.status(404).json({ message: "Organization not found" });
     if (!await requireCrmFeature(res, org.ownerUserId, "jobCosting")) return;
     if (co.approvedAt || co.declinedAt) return res.status(409).json({ message: "Already responded to." });
+    // A voided change order was withdrawn by the contractor: its old link must not be signable.
+    if (co.status === "void") return res.status(409).json({ message: "This change order has been withdrawn." });
     const approve = parsed.data.decision === "approve";
     if (approve && !parsed.data.signatureName) return res.status(400).json({ message: "Please type your name to approve." });
     const [row] = await db.update(crmChangeOrders).set({
@@ -1145,7 +1212,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       declinedAt: approve ? null : new Date(),
       signatureName: approve ? parsed.data.signatureName ?? null : null,
       updatedAt: new Date(),
-    }).where(eq(crmChangeOrders.id, co.id)).returning();
+      // Only the first answer writes: two answers at once (a double click) must not both land.
+    }).where(and(eq(crmChangeOrders.id, co.id), isNull(crmChangeOrders.approvedAt), isNull(crmChangeOrders.declinedAt),
+      sql`${crmChangeOrders.status} <> 'void'`)).returning();
+    if (!row) return res.status(409).json({ message: "Already responded to." });
     queueCrmEvent(co.orgId, approve ? "changeorder.approved" : "changeorder.declined", {
       changeOrderId: co.id, projectId: co.projectId, number: co.number, title: co.title,
       amountCents: co.amountCents, scheduleImpactDays: co.scheduleImpactDays ?? null,
@@ -1349,7 +1419,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const [row] = await db.update(crmProjects)
       .set({ ...parsed.data, updatedAt: new Date() } as any)
       .where(eq(crmProjects.id, proj.id)).returning();
-    res.json(row);
+    res.json(stripMoney(ctx, row, { price: ["contractValueCents"], cost: ["budgetCents"] }));
   });
 
   // ══ PUBLIC API KEYS + WEBHOOKS ════════════════════════════════════════════
@@ -1557,8 +1627,8 @@ export function registerCrmPhaseRoutes(app: Express, getDevUser: GetUser): void 
     const parsed = z.object({
       name: z.string().min(1).max(150),
       sortOrder: z.number().int().min(0).max(999).default(0),
-      startDate: z.string().nullable().optional(),
-      endDate: z.string().nullable().optional(),
+      startDate: z.string().refine((v) => !v || !Number.isNaN(Date.parse(v)), "Enter a valid date.").nullable().optional(),
+      endDate: z.string().refine((v) => !v || !Number.isNaN(Date.parse(v)), "Enter a valid date.").nullable().optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid phase", issues: parsed.error.issues });
     const [proj] = await db.select().from(crmProjects)

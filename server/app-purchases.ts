@@ -21,6 +21,13 @@ export const APP_NO_PURCHASE_ROUTES = [
   "/api/crm/billing/checkout",
   "/api/crm/billing/change",
   "/api/seo/credits/checkout",
+  // A la carte items, the Call Assistant's own subscription, research reports and press release packages
+  // (the same inventory as PAUSABLE_CHECKOUT_ROUTES in server/billing/checkout-pause.ts).
+  "/api/alacarte/checkout",
+  "/api/call-assistant/billing/checkout",
+  "/api/call-assistant/billing/change",
+  "/api/research-reports/orders/:id/checkout",
+  "/api/press/orders",
 ] as const;
 
 export const nativePurchaseGuard: RequestHandler = (req, res, next) => {

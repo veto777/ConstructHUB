@@ -349,6 +349,8 @@ export async function summary(capUsd: number, config: BacklinkSummary["config"])
 export async function setStatus(id: number, status: BacklinkStatus, by: number, patch: { priceUsd?: number | null; turnaroundDays?: number | null; notes?: string | null } = {}): Promise<boolean> {
   const r = await db().query(
     `UPDATE backlink_sources SET status = $2,
+            attempts = CASE WHEN $2 = 'discovered' THEN 0 ELSE attempts END,
+            lease_token = CASE WHEN $2 = 'discovered' THEN NULL ELSE lease_token END, lease_until = CASE WHEN $2 = 'discovered' THEN NULL ELSE lease_until END,
             price_usd = CASE WHEN $3::boolean THEN $4::numeric ELSE price_usd END, turnaround_days = CASE WHEN $5::boolean THEN $6::integer ELSE turnaround_days END,
             notes = CASE WHEN $7::boolean THEN $8::text ELSE notes END, updated_at = now() WHERE id = $1`,
     [id, status, patch.priceUsd !== undefined, patch.priceUsd ?? null, patch.turnaroundDays !== undefined, patch.turnaroundDays ?? null, patch.notes !== undefined, patch.notes ?? null]);

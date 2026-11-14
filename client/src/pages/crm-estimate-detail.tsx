@@ -53,6 +53,11 @@ interface EditLine {
   priceText: string;
   taxable: boolean;
   hiddenFromClient: boolean;
+  // Carried through untouched: the save replaces every line, so anything not
+  // sent back is lost (cost, price-book link, hand-picked scope category).
+  unitCostCents?: number | null;
+  pricebookItemId?: string | null;
+  scopeCategory?: string | null;
 }
 
 const BLANK: EditLine = {
@@ -158,6 +163,9 @@ export default function CrmEstimateDetailPage() {
       priceText: (((i.unitPriceCents ?? 0) as number) / 100).toString(),
       taxable: i.taxable ?? true,
       hiddenFromClient: i.hiddenFromClient ?? false,
+      unitCostCents: i.unitCostCents,
+      pricebookItemId: i.pricebookItemId,
+      scopeCategory: i.scopeCategory,
     })));
     setEditing(true);
   };
@@ -234,6 +242,9 @@ export default function CrmEstimateDetailPage() {
           taxable: l.taxable,
           hiddenFromClient: l.hiddenFromClient,
           sortOrder: idx,
+          unitCostCents: l.unitCostCents ?? undefined,
+          pricebookItemId: l.pricebookItemId ?? undefined,
+          scopeCategory: l.scopeCategory ?? undefined,
         })),
       })).json();
     },
@@ -251,6 +262,9 @@ export default function CrmEstimateDetailPage() {
     mutationFn: async () => (await apiRequest("POST", `/api/crm/estimates/${id}/send`, {})).json(),
     onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${id}`] });
+      // The lists and the client page show this estimate's status too.
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
+      if (e?.customerId) queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${e.customerId}`] });
       if (r.emailed) {
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}.` });
       } else {

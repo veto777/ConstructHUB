@@ -33,17 +33,32 @@ export async function preparePhoto(buffer: Buffer, name: string, exif: {
         await rm(dir, { recursive: true, force: true });
     }
 }
+/** Bulk posts take up to 400 photos from the device (bulk-posts.ts MAX_PHOTOS); the editor takes 100. */
+export const UPLOAD_MAX_INDEX = 399;
+export const uploadBudget = (userId: number, bulk: boolean) => bulk
+    ? { key: `gbp-bulk-upload:${userId}`, limit: 400 }
+    : { key: `gbp-content-upload:${userId}`, limit: 100 };
+// The upload only writes to the account's own media library, so the location need not be linked to Google
+// (Set logo on the Locations page uses it for any location; ownedLocation would refuse an unlinked one).
+async function ownLocation(userId: number, id: number) {
+    const { rows: [l] } = await pool.query('SELECT * FROM business_locations WHERE id=$1 AND user_id=$2', [id, userId]);
+    if (!l)
+        throw new GoogleError('invalid', 'Location not found', 404);
+    return l;
+}
 export function registerContentUpload(app: Express, auth: (req: any, res: any) => any) {
     const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 }, fileFilter: (_r, f, cb) => cb(null, ['image/jpeg', 'image/png', 'image/webp'].includes(f.mimetype)) });
-    // The browser streams up to 100 files sequentially. A single request never buffers 100 full photos.
+    // The browser streams the files sequentially (100 from the editor, up to 400 for a bulk run). A single request never buffers them all.
     app.post('/api/gbp/content/:location/upload', async (req, res, next) => {
         const u = auth(req, res);
         if (!u)
             return;
         try {
             const loc = z.coerce.number().int().positive().parse(req.params.location);
-            await ownedLocation(u.id, loc);
-            if (!await takeAccountBudget(u.id, `gbp-content-upload:${u.id}`, 100, 1, 3600000))
+            await ownLocation(u.id, loc);
+            // A bulk run (?bulk=1, client/src/components/bulk-posts.tsx) has its own hourly budget sized to one full run.
+            const budget = uploadBudget(u.id, req.query.bulk === '1');
+            if (!await takeAccountBudget(u.id, budget.key, budget.limit, 1, 3600000))
                 return void res.status(429).json({ message: 'Hourly photo processing limit reached' });
             next();
         }
@@ -54,7 +69,7 @@ export function registerContentUpload(app: Express, auth: (req: any, res: any) =
         if (err)
             return void res.status(400).json({ message: 'Upload one JPEG, PNG or WebP, up to 15 MB' });
         try {
-            const u = req.user!, loc = await ownedLocation(u.id, Number(req.params.location)), b = options.parse(req.body), index = z.coerce.number().int().min(0).max(99).parse(req.body.index || 0);
+            const u = req.user!, loc = await ownLocation(u.id, Number(req.params.location)), b = options.parse(req.body), index = z.coerce.number().int().min(0).max(UPLOAD_MAX_INDEX).parse(req.body.index || 0);
             if (!req.file)
                 throw new Error('Photo required');
             const name = seoName(b.pattern, loc.business_name, loc.city || '', index), p = await preparePhoto(req.file.buffer, name, { title: b.title, lat: b.lat, lon: b.lon });

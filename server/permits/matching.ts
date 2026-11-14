@@ -176,3 +176,13 @@ export function contentHash(r: PermitRecord): string {
   ]));
   return h.digest("hex");
 }
+
+/**
+ * A digest that was tried and reached nobody: at least one channel was attempted and none succeeded (SMTP down,
+ * a rejected text). Its hits stay un-notified so the next poll sends them again (audit 08 #8). A digest with no
+ * channel switched on has nothing to retry.
+ */
+export function digestUndelivered(results: Record<string, { ok: boolean } | undefined> | null | undefined): boolean {
+  const tried = Object.values(results ?? {}).filter((r): r is { ok: boolean } => !!r);
+  return tried.length > 0 && tried.every((r) => !r.ok);
+}

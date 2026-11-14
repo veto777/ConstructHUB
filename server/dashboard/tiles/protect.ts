@@ -40,7 +40,7 @@ export const protectTiles: TileSources = {
     if (!ids.length) return EMPTY;
     const [r] = await dq(
       `SELECT count(*)::int blocked, count(DISTINCT ip_address)::int uniq
-         FROM vpn_visits WHERE domain_id = ANY($1::int[]) AND action='blocked' AND visited_at > now() - interval '30 days'`, [ids]);
+         FROM vpn_visits WHERE domain_id = ANY($1::int[]) AND action IN ('block','blocked') AND visited_at > now() - interval '30 days'`, [ids]);
     return ok([
       metric("blocked30d", "VPN visits blocked (30 days)", int(r.blocked), "count"),
       metric("uniqueIps30d", "Unique IPs", int(r.uniq), "count"),

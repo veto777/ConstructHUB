@@ -17,12 +17,15 @@ import {
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { requireOrg, requirePermission, requireAnyPermission, type OrgContext } from "./tenancy";
 import { recalcEstimate } from "./entities";
+import { objectPolicy } from "./object-access";
+import { divisionScopeOf } from "./divisions";
+import { divisionIdForAddress } from "./customer-address-state";
 import { lockDocNumbers, nextDocNumber, type DocNumberPrefix } from "./doc-number";
 import { sendWithFallback } from "../email";
 import {
   MAX_CSV_BYTES, MAX_ROWS, MIGRATE_ENTITIES, MIGRATE_FIELDS,
   parseCsv, guessMapping, applyMapping, validateRecord,
-  parseMoneyToCents, mapEstimateStatus, mapInvoiceStatus,
+  parseMoneyToCents, mapEstimateStatus, mapInvoiceStatus, dedupePhoneDigits,
   type MigrateEntity,
 } from "./migrate-lib";
 
@@ -43,7 +46,7 @@ interface RowOutcome {
 async function findCustomerDupe(orgId: string, email?: string | null, phone?: string | null) {
   const dupeOn = [
     email ? sql`lower(${crmCustomers.email}) = ${email.toLowerCase()}` : null,
-    phone ? sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${phone.replace(/\D/g, "")}` : null,
+    dedupePhoneDigits(phone) ? sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${dedupePhoneDigits(phone)}` : null,
   ].filter(Boolean) as any[];
   if (!dupeOn.length) return null;
   const [existing] = await db
@@ -63,7 +66,8 @@ async function importCustomerRow(
   const phone = rec.phone || null;
   if (!force) {
     const dupe = await findCustomerDupe(ctx.org.id, email, phone);
-    if (dupe) return { dupe: dupe.displayName };
+    // The skip message names the match only when this seat may open it.
+    if (dupe) return { dupe: (await objectPolicy(ctx).visible("customers", dupe.id)) ? dupe.displayName : "" };
   }
   const displayName =
     rec.displayName ||
@@ -74,6 +78,10 @@ async function importCustomerRow(
     .values({
       orgId: ctx.org.id,
       ownerMemberId: ctx.member.id,
+      // Same rule as creating one client by hand: the workspace the import
+      // runs in, else the one division covering the address's state.
+      divisionId: divisionScopeOf(ctx)
+        ?? await divisionIdForAddress(ctx.org.id, { state: rec.state, postalCode: rec.postalCode, addressLine1: rec.addressLine1, city: rec.city }).catch(() => null),
       displayName,
       firstName: rec.firstName || null,
       lastName: rec.lastName || null,
@@ -394,7 +402,7 @@ export function registerCrmMigrateRoutes(app: Express, getDevUser: GetUser): voi
           const out = await importCustomerRow(ctx, rec, force);
           if ("dupe" in out) {
             skipped++;
-            results.push({ row: rowNum, status: "skipped", message: `already exists as "${out.dupe}" (email or phone match)` });
+            results.push({ row: rowNum, status: "skipped", message: out.dupe ? `already exists as "${out.dupe}" (email or phone match)` : "already exists (email or phone match)" });
           } else {
             created++;
             results.push({ row: rowNum, status: "created", id: out.id });

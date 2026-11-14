@@ -47,7 +47,7 @@ import { EstimateDefaultFiles } from "@/components/estimate-attachments-card";
 import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { CustomerMeasurements } from "@/components/client-measurements";
 import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
-import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
+import { TakePaymentDialog, invoiceDueCents, uploadPaymentProof } from "@/components/crm-take-payment";
 import { deadLeadOf } from "@shared/bid-status";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
@@ -603,11 +603,12 @@ export default function CrmClientPage() {
   });
 
   const { data: apptData } = useQuery<any>({
-    queryKey: ["/api/crm/appointments", "client-hub"],
+    queryKey: ["/api/crm/appointments", "client-hub", id],
     queryFn: async () => {
       const from = new Date(Date.now() - 30 * 86400000).toISOString();
       const to = new Date(Date.now() + 365 * 86400000).toISOString();
-      return (await apiRequest("GET", `/api/crm/appointments?from=${from}&to=${to}`, undefined)).json();
+      // This client's visits only: the org-wide list is capped and would drop later ones.
+      return (await apiRequest("GET", `/api/crm/appointments?from=${from}&to=${to}&customerId=${encodeURIComponent(id ?? "")}`, undefined)).json();
     },
     enabled: !!id,
   });
@@ -622,8 +623,9 @@ export default function CrmClientPage() {
 
   // Only once the client itself has loaded: for a missing or foreign client the
   // thread would just 404 alongside it.
+  // Same key as the Inbox page's thread, so a reply on either refreshes both.
   const { data: thread } = useQuery<any>({
-    queryKey: [`/api/crm/inbox/${id}`],
+    queryKey: ["/api/crm/inbox", id],
     enabled: !!id && !!data && canManageCustomers,
     retry: false,
   });
@@ -633,7 +635,7 @@ export default function CrmClientPage() {
     queryClient.invalidateQueries({ queryKey: [`/api/crm/invoices?customerId=${id}`] });
     queryClient.invalidateQueries({ queryKey: [`/api/crm/payments?customerId=${id}`] });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/appointments"] });
-    queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/inbox", id] });
     // Sibling surfaces the client page also writes to (staleTime is Infinity,
     // so only explicit invalidation ever refreshes them): the schedule page's
     // agenda view and the org-wide Payments page.
@@ -709,7 +711,8 @@ export default function CrmClientPage() {
       (await apiRequest("POST", `/api/crm/inbox/${id}/reply`, { body: replyBody.trim() })).json(),
     onSuccess: (r: any) => {
       setReplyBody("");
-      queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
+      // The Inbox list and every cached thread (this one included).
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/inbox"] });
       // Word the toast from what actually happened: the portal post always
       // lands; the email copy only goes out when there's an address on file.
       const email: string | null = data?.customer?.email ?? null;
@@ -803,13 +806,23 @@ export default function CrmClientPage() {
   const [payNote, setPayNote] = useState("");
   // What the button records, in whole cents — "0.001" is $0.00, not a payment.
   const payAmountCents = Math.round((parseFloat(payAmount) || 0) * 100);
+  // The photo or copy of the check: Settings can ask for one (or require it) on check and cash.
+  const { data: payStatus } = useQuery<any>({ queryKey: ["/api/crm/payments/status"], enabled: !!payFor });
+  const payPhotoRule: "off" | "optional" | "required" = payStatus?.reconcile?.photo ?? "optional";
+  const [payProof, setPayProof] = useState<File | null>(null);
+  const payProofRef = useRef<HTMLInputElement>(null);
+  const payNeedsPhoto = payPhotoRule === "required" && (payMethod === "check" || payMethod === "cash");
+  useEffect(() => { setPayProof(null); }, [payFor?.id]);
   const recordPayment = useMutation({
-    mutationFn: async () =>
-      (await apiRequest("POST", `/api/crm/invoices/${payFor.id}/payments`, {
+    mutationFn: async () => {
+      const proofAttachmentId = payProof ? await uploadPaymentProof(payFor.customerId ?? id, payProof) : null;
+      return (await apiRequest("POST", `/api/crm/invoices/${payFor.id}/payments`, {
         amountCents: payAmountCents,
         method: payMethod,
         note: payNote || null,
-      })).json(),
+        ...(proofAttachmentId ? { proofAttachmentId } : {}),
+      })).json();
+    },
     onSuccess: (r: any) => {
       const number = payFor?.number;
       setPayFor(null); setPayAmount(""); setPayNote("");
@@ -1320,6 +1333,8 @@ export default function CrmClientPage() {
       autosave.reset();
       resetForm();
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+      // The estimate's own page and the Estimates list cache it too.
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
       toast({ title: wasEditing ? "Estimate saved" : "Estimate created" });
     },
     onError: (e: any) => toast({ title: "Could not create estimate", description: apiErrorMessage(e), variant: "destructive" }),
@@ -1338,6 +1353,7 @@ export default function CrmClientPage() {
       (await apiRequest("POST", `/api/crm/estimates/${estimateId}/send`, { sms: alsoText })).json(),
     onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
       if (r.emailed) {
         const textPart = r.texted ? " and texted" : r.smsError ? ` (text failed: ${r.smsError})` : "";
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}${textPart}.` });
@@ -2102,6 +2118,7 @@ export default function CrmClientPage() {
                                 await apiRequest("PATCH", `/api/crm/pricebook/items/${it.pricebookItemId}`, { [it.listField!]: it.unitPriceCents });
                                 setTabItems((cur) => cur.map((x, i) => i === idx ? { ...x, listPriceCents: it.unitPriceCents } : x));
                                 queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook/items"] });
+                                queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/pricebook/items?") });
                                 toast({ title: `Price book updated to ${money(it.unitPriceCents)}`, description: it.name });
                               } catch (e: any) {
                                 toast({ title: "Could not update the price book", description: apiErrorMessage(e), variant: "destructive" });
@@ -2905,6 +2922,15 @@ export default function CrmClientPage() {
               <Input id="pay-note" value={payNote} onChange={(e) => setPayNote(e.target.value)}
                 placeholder="Check #1042" />
             </div>
+            {payPhotoRule !== "off" && (
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span>Photo or copy of the check{payNeedsPhoto ? <span className="text-destructive"> *</span> : <span className="text-muted-foreground"> (optional)</span>}
+                  {payProof && <span className="text-muted-foreground" data-testid="text-payment-photo-name"> · {payProof.name}</span>}</span>
+                <Button size="sm" variant="outline" className="h-7" onClick={() => payProofRef.current?.click()} data-testid="button-payment-photo">{payProof ? "Change" : "Add"}</Button>
+                <input ref={payProofRef} type="file" accept="image/*,application/pdf" capture="environment" className="hidden"
+                  onChange={(ev) => setPayProof(ev.target.files?.[0] ?? null)} data-testid="input-payment-photo" />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button onClick={() => confirmAction({
@@ -2914,7 +2940,7 @@ export default function CrmClientPage() {
                 confirmLabel: "Yes, record it", destructive: false,
                 onConfirm: () => recordPayment.mutate(),
               })}
-              disabled={payAmountCents < 1 || recordPayment.isPending} data-testid="button-save-payment">
+              disabled={payAmountCents < 1 || recordPayment.isPending || (payNeedsPhoto && !payProof)} data-testid="button-save-payment">
               {recordPayment.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Record {payAmountCents >= 1 ? money(payAmountCents) : "payment"}
             </Button>

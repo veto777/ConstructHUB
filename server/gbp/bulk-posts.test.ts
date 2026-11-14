@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planTimes, zonedInstant, dropboxZipUrl } from './bulk-posts';
+import { planTimes, zonedInstant, dropboxZipUrl, readCapped } from './bulk-posts';
 
 describe('bulk posts planning', () => {
   it('puts a wall-clock time on a calendar day in the zone, DST included', () => {
@@ -26,5 +26,26 @@ describe('bulk posts planning', () => {
     expect(dropboxZipUrl('https://www.dropbox.com/scl/fo/abc/h?rlkey=x&dl=0')).toBe('https://www.dropbox.com/scl/fo/abc/h?rlkey=x&dl=1');
     expect(() => dropboxZipUrl('https://evil.example/scl/fo/abc')).toThrow(/dropbox.com/);
     expect(() => dropboxZipUrl('not a link')).toThrow(/Dropbox/);
+  });
+
+  it('reads a download only up to its cap (audit M11)', async () => {
+    expect((await readCapped(new Response('abcdef'), 10, 'too big')).toString()).toBe('abcdef');
+    await expect(readCapped(new Response('abcdef'), 5, 'too big')).rejects.toThrow('too big');
+    // Declared length over the cap: refused before a byte is read.
+    await expect(readCapped(new Response('x', { headers: { 'content-length': '999999999' } }), 10, 'too big')).rejects.toThrow('too big');
+    // No declared length: the stream is counted and dropped once it passes the cap.
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({ pull(c) { pulled++; c.enqueue(new Uint8Array(1024)); } });
+    await expect(readCapped(new Response(endless), 4096, 'too big')).rejects.toMatchObject({ kind: 'invalid' });
+    expect(pulled).toBeLessThan(20);
+  });
+  it('a bulk run can upload as many photos as a run accepts (audit H5)', async () => {
+    const { uploadBudget, UPLOAD_MAX_INDEX } = await import('./content-upload');
+    const { createInput } = await import('./bulk-posts');
+    const run = { name: 'x', source: 'library', startOn: '2027-01-04', timezone: 'America/New_York' };
+    expect(createInput.safeParse({ ...run, photoIds: Array.from({ length: UPLOAD_MAX_INDEX + 1 }, (_, i) => i + 1) }).success).toBe(true);
+    expect(createInput.safeParse({ ...run, photoIds: Array.from({ length: UPLOAD_MAX_INDEX + 2 }, (_, i) => i + 1) }).success).toBe(false);
+    expect(uploadBudget(7, true)).toEqual({ key: 'gbp-bulk-upload:7', limit: UPLOAD_MAX_INDEX + 1 });
+    expect(uploadBudget(7, false)).toEqual({ key: 'gbp-content-upload:7', limit: 100 });
   });
 });

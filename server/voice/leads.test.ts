@@ -243,7 +243,7 @@ describe("lead delivery (real DB)", () => {
     await (await import("./call-tasks")).runCallTasksFor(c.id);
     const texts = smsTo(smsTarget);
     expect(texts).toHaveLength(1);
-    expect(texts[0].body).toContain("New phone lead — Sam");
+    expect(texts[0].body).toContain("New phone lead - Sam");
     // Metered against the owner's monthly text allowance like every other org text.
     const month = new Date().toISOString().slice(0, 7);
     const { rows: [used] } = await pool.query("select used from growth_budgets where key = $1 and period = '0'", [`quota:user:${b.userId}:texts:${month}`]);

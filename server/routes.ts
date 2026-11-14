@@ -3,7 +3,7 @@ import { getReferralSettings, saveReferralSettings, referralSettingsInput } from
 import { getReviewEscalationThreshold, saveReviewEscalationThreshold, reviewEscalationSettingsInput, escalatePrivateFeedback } from "./review-escalation";
 import { isPrivateFirstScore } from "@shared/review-flow";
 import { normalizeOtherReviewLinks, normalizePrimaryReviewUrl, reviewLinkLabel, type OtherReviewLink } from "@shared/review-links";
-import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
+import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, quotaKey, monthKey, type QuotaReservation } from "./growth-quotas";
 import { isConfigured as dataforseoConfigured, normalizeBusinessName } from "./seo/dataforseo";
 import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
 import { withBudget, SeoBudgetError } from "./seo/budget";
@@ -34,7 +34,7 @@ import { scheduleIntervalMs } from "@shared/scrape-schedules";
 import { COMPETITOR_RADIUS_MAX, COMPETITOR_RADIUS_MIN } from "@shared/competitor-scan";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
 import { readSearchPage, SEARCH_PAGE_MESSAGE } from "./search-page";
-import { effectiveVpnMode, savedVpnMode, VPN_DEFAULT_MODE } from "./vpn-mode";
+import { effectiveVpnMode, savedVpnMode, VPN_DEFAULT_MODE, VPN_TRACK_ID_MAX, vpnTrackFields, vpnTrackLimiter } from "./vpn-mode";
 import { getAdapter } from "./scrapers/registry";
 import { liveSearchOutcome } from "./live-search-outcome";
 import { randomUUID } from "crypto";
@@ -53,8 +53,10 @@ import { platformAccessGate, requirePlatformAccess } from "./platform-access";
 import { registerTrackingRoutes } from "./tracking-script";
 import { registerAdsConsultantRoutes } from "./ads-consultant";
 import { registerHubRoutes } from "./hub";
-import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
+import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, isGoogleMapsPageUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
+import { trackField, allowClickTrack } from "./click-guard-collector";
+import { cleanReviewPhotos } from "./review-photos";
 import { uploadToR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { registerPublicFileRoutes } from "./files/public-files";
 import { db, pool } from "./db";
@@ -817,6 +819,7 @@ export async function registerRoutes(
   // One county's permit portals (display link fields) — a county drill-down.
   app.get("/api/databases/county/:countyId", requirePlatformAccess, async (req, res) => {
     const countyId = parseInt(String(req.params.countyId));
+    if (isNaN(countyId)) return res.status(400).json({ message: "Invalid county id" });
     const databases = await storage.getDatabasesByCounty(countyId);
     res.json(databases.map(governmentPermitForDisplay));
   });
@@ -1013,6 +1016,20 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Automated search is not supported for this portal. Open the official portal to search." });
       }
 
+      // The Databases dialog still sends the older scraper names. A registry adapter knows "permit" and "company",
+      // and one that does not offer the chosen search fails at once, after a monthly search was already used
+      // (audit 08 #6): translate the name, and refuse an unsupported type before the quota is touched.
+      let scrapeType: string = searchType || "address";
+      const registry = await import("./scrapers/registry");
+      const adapter = registry.getAdapterFor({ platform: db.platform, jurisdiction: db.jurisdiction });
+      if (adapter && !registry.isLegacyAdapter(adapter)) {
+        scrapeType = ({ permit_number: "permit", company_name: "company" } as Record<string, string>)[scrapeType] ?? scrapeType;
+        const supported = adapter.capabilities.search as string[];
+        if (!supported.includes(scrapeType)) {
+          return res.status(400).json({ message: `This portal cannot be searched by ${scrapeType.replace(/_/g, " ")}. It supports: ${supported.join(", ") || "no live search"}.` });
+        }
+      }
+
       if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
       const query = await storage.createSearchQuery({
         userId: req.user!.id,
@@ -1026,7 +1043,7 @@ export async function registerRoutes(
       const url = db.searchUrl || db.portalUrl!;
       const platform = db.platform!;
 
-      scrapeByPlatform(platform, url, searchTerm, searchType || "address", db.id, db.name, query.id, jobId, db.jurisdiction)
+      scrapeByPlatform(platform, url, searchTerm, scrapeType, db.id, db.name, query.id, jobId, db.jurisdiction)
         .catch((err) => logError("Scrape error:", err));
 
       res.json({ jobId, queryId: query.id, message: "Scrape started" });
@@ -1146,6 +1163,7 @@ export async function registerRoutes(
 
   app.get("/api/search-results/:queryId", async (req, res) => {
     const queryId = parseInt(req.params.queryId);
+    if (isNaN(queryId)) return res.status(400).json({ message: "Invalid search id" });
     if (!(await canReadQuery(req, queryId))) return res.status(404).json({ message: "Search not found" });
     const results = await storage.getSearchResults(queryId);
     res.json(results);
@@ -1293,6 +1311,7 @@ export async function registerRoutes(
   // link fields (portalUrl/searchUrl/linkStatus/lastVerifiedAt).
   app.get("/api/property-appraisers/county/:countyId", requireModule("propertyRecords"), async (req, res) => {
     const countyId = parseInt(String(req.params.countyId));
+    if (isNaN(countyId)) return res.status(400).json({ message: "Invalid county id" });
     const appraisers = await storage.getPropertyAppraisersByCounty(countyId);
     res.json(appraisers.map(governmentLinksForDisplay));
   });
@@ -1339,6 +1358,7 @@ export async function registerRoutes(
 
   app.get("/api/property-records/:countyId", requireModule("propertyRecords"), async (req, res) => {
     const countyId = parseInt(String(req.params.countyId));
+    if (isNaN(countyId)) return res.status(400).json({ message: "Invalid county id" });
     const records = await storage.getPropertyRecords(countyId);
     res.json(records);
   });
@@ -1574,7 +1594,7 @@ export async function registerRoutes(
           try {
             scraped = await scrapeGoogleMapsBusiness({
               name: synthName,
-              mapsUrl: /google\.\w+\/maps/i.test(photoEffectiveUrl) ? photoEffectiveUrl : null,
+              mapsUrl: isGoogleMapsPageUrl(photoEffectiveUrl) ? photoEffectiveUrl : null,
               kgmid: kgmid || extractMapsDataKgmid(photoEffectiveUrl),
             });
           } catch {}
@@ -2555,7 +2575,7 @@ export async function registerRoutes(
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
       if (!apiKey) return res.status(500).json({ message: "API key not configured" });
 
-      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry&key=${apiKey}`;
+      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(String(placeId))}&fields=geometry&key=${apiKey}`;
       const detailRes = await fetch(url);
       const data = await detailRes.json() as any;
 
@@ -2615,13 +2635,31 @@ export async function registerRoutes(
   });
 
   // Ranking Grid Routes
+  // A grid runs inside this process (runRankingGridScan). One cut off by a restart would stay "running"
+  // for ever: the page would poll it without end and its credits would never come back. A scan still
+  // "running" after RANKING_GRID_STALE_MS that this process is not working on is closed as failed and,
+  // like any failed grid, gets its credits back. The status flip is one guarded UPDATE, so it refunds once.
+  const RANKING_GRID_STALE_MS = 30 * 60_000;
+  const rankingGridInFlight = new Set<number>();
+  async function closeStaleRankingGridScan<T extends { id: number; userId: number | null; gridSize: number; status: string; createdAt: Date }>(scan: T): Promise<T> {
+    if (scan.status !== "running" || rankingGridInFlight.has(scan.id)) return scan;
+    const started = new Date(scan.createdAt);
+    if (!(Date.now() - started.getTime() > RANKING_GRID_STALE_MS)) return scan;
+    const { rowCount } = await pool.query("UPDATE ranking_grid_scans SET status='failed' WHERE id=$1 AND status='running'", [scan.id]);
+    if (!rowCount) return scan;
+    const credits = gridCreditCost(scan.gridSize);
+    if (scan.userId != null) await refundReservation({ key: quotaKey(scan.userId, "rankings", monthKey(started)), remaining: credits }, credits);
+    console.warn(`[ranking-grid] scan ${scan.id} was left running by a restart: closed as failed, ${credits} credit(s) returned`);
+    return { ...scan, status: "failed" };
+  }
+
   // The Ranking Grid scan history cards: the owner's scans, newest first (the page polls every few
   // seconds while one is running).
   app.get("/api/ranking-grid/scans", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
       const scans = await storage.getRankingGridScans(ownerScope(req));
-      res.json(scans);
+      res.json(await Promise.all(scans.map(closeStaleRankingGridScan)));
     } catch (err: any) {
       fail500(res, "GET /api/ranking-grid/scans failed:", err);
     }
@@ -2632,8 +2670,9 @@ export async function registerRoutes(
   app.get("/api/ranking-grid/scans/:id", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      const scan = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
-      if (!scan) return res.status(404).json({ message: "Scan not found" });
+      const found = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
+      if (!found) return res.status(404).json({ message: "Scan not found" });
+      const scan = await closeStaleRankingGridScan(found);
       const results = await storage.getRankingGridResults(scan.id);
       res.json({ scan, results });
     } catch (err: any) {
@@ -2677,24 +2716,31 @@ export async function registerRoutes(
       const credits = gridCreditCost(Number(gridSize || 3));
       if (!(await reserveMonthlyQuota(req, res, "rankings", credits))) return;
       const reservation: QuotaReservation | undefined = res.locals.growthQuota;
-      const scan = await storage.createRankingGridScan({
-        userId: user.id,
-        businessName,
-        placeId,
-        address: address || null,
-        lat: String(lat),
-        lon: String(lon),
-        gridSize: gridSize || 3,
-        gridDistance: String(gridDistance || "1"),
-        keyword,
-        status: "running",
-        averageRank: null,
-      });
+      // A scan that could not even be saved never ran: its credits go back.
+      let scan: Awaited<ReturnType<typeof storage.createRankingGridScan>>;
+      try {
+        scan = await storage.createRankingGridScan({
+          userId: user.id,
+          businessName,
+          placeId,
+          address: address || null,
+          lat: String(lat),
+          lon: String(lon),
+          gridSize: Number(gridSize || 3),
+          gridDistance: String(gridDistance || "1"),
+          keyword,
+          status: "running",
+          averageRank: null,
+        });
+      } catch (e) { await refundReservation(reservation, credits); throw e; }
 
       // A grid that fails gives its credits back.
-      runRankingGridScan(scan.id, user.id, String(businessName), parseFloat(lat), parseFloat(lon), gridSize || 3, parseFloat(gridDistance || "1"), keyword)
+      const scanId = scan.id;
+      rankingGridInFlight.add(scanId);
+      runRankingGridScan(scanId, user.id, String(businessName), parseFloat(lat), parseFloat(lon), Number(gridSize || 3), parseFloat(gridDistance || "1"), keyword)
         .then(ok => { if (!ok) return refundReservation(reservation, credits); })
-        .catch(err => logError("Ranking grid scan error:", err));
+        .catch(err => logError("Ranking grid scan error:", err))
+        .finally(() => rankingGridInFlight.delete(scanId));
 
       res.json(scan);
     } catch (err: any) {
@@ -2874,6 +2920,7 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
+      if (!Number.isInteger(scanId)) return res.status(404).json({ message: "Scan not found" });
       const [scan] = await db.select().from(competitorScans).where(and(eq(competitorScans.id, scanId), eq(competitorScans.userId, userId)));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
       // Best-rated first, most-reviewed among equals; a listing with no rating yet goes last (Postgres puts
@@ -2912,6 +2959,7 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
+      if (!Number.isInteger(scanId)) return res.status(404).json({ message: "Scan not found" });
       // One transaction: ownership verified under a row lock first (a foreign id changes nothing),
       // an active scan cancelled and its month refunded, then listings and scan removed.
       const removed = await removeCompetitorScan(userId, scanId, new Date());
@@ -3453,7 +3501,9 @@ export async function registerRoutes(
   app.post("/api/citations/campaigns/:id/run", async (req, res) => {
     if (!(await requireCitationsPlan(req, res))) return;
     try {
-      const user = (req as any).user;
+      // The workspace owner for an agency team member, as on every other citation route.
+      const user = getDevUser(req, res);
+      if (!user) return;
       const id = parseInt(req.params.id);
       await ensureChecklist(id, user.id);
       res.json({ message: "Checklist ready", campaignId: id });
@@ -3770,10 +3820,26 @@ export async function registerRoutes(
       res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-      const { trackingId, fingerprint, deviceType, browser, os, screenResolution, language, timezone, referrer, landingPage, userAgent } = req.body;
+      // Public and unauthenticated: every field is a short string (click-guard-collector.ts); the body itself
+      // is capped in server/index.ts.
+      const b = req.body && typeof req.body === "object" ? req.body : {};
+      const trackingId = trackField(b.trackingId, "trackingId");
+      const fingerprint = trackField(b.fingerprint, "fingerprint");
+      const deviceType = trackField(b.deviceType, "deviceType");
+      const browser = trackField(b.browser, "browser");
+      const os = trackField(b.os, "os");
+      const screenResolution = trackField(b.screenResolution, "screenResolution");
+      const language = trackField(b.language, "language");
+      const timezone = trackField(b.timezone, "timezone");
+      const referrer = trackField(b.referrer, "referrer");
+      const landingPage = trackField(b.landingPage, "landingPage");
+      const userAgent = trackField(b.userAgent, "userAgent");
 
       if (!trackingId) {
         return res.status(400).json({ message: "Missing trackingId" });
+      }
+      if (!allowClickTrack(visitorIp(req))) {
+        return res.status(429).json({ message: "Too many requests" });
       }
 
       const domain = await storage.getTrackedDomainByTrackingId(trackingId);
@@ -3786,7 +3852,7 @@ export async function registerRoutes(
       const isBlocked = await storage.isIpBlocked(domain.id, ip);
 
       const suspicionReasons: string[] = [];
-      const ua = userAgent || req.headers["user-agent"] || "";
+      const ua = userAgent || trackField(req.headers["user-agent"], "userAgent") || "";
 
       for (const pattern of BOT_PATTERNS) {
         if (pattern.test(ua)) {
@@ -4431,9 +4497,8 @@ function main() {
       }
 
       const visitorIp = req.params.visitorIp;
-      const visits = await storage.getClickVisits(domain.id);
-      const visitorVisits = visits.filter(v => v.ipAddress === visitorIp)
-        .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime());
+      // This visitor's own visits, newest first (not the newest 1000 of the whole site filtered by IP).
+      const visitorVisits = await storage.getVisitsByIp(domain.id, visitorIp);
 
       if (visitorVisits.length === 0) {
         return res.status(404).json({ message: "Visitor not found" });
@@ -4755,21 +4820,37 @@ function main() {
   // VPN Shield collector: matches the visitor IP against known VPN-provider/datacenter
   // prefixes plus WebRTC-leak and extension signals; on detection writes vpn_visits with
   // the site's configured action (block/log/redirect) and tells the script what to do.
+  // Anonymous and firewall-exempt, so it is bounded here (audit 08 #1): the body is capped at 16 KB in
+  // server/index.ts, stored strings are cut to fixed lengths, and calls are counted per visitor address
+  // and per site. Over the limit the script is told "not blocked" (it never breaks the customer's page).
+  const vpnTrackIpLimit = vpnTrackLimiter(120, 60_000);
+  const vpnTrackSiteLimit = vpnTrackLimiter(1200, 60_000);
   app.post("/api/vpn-shield/track", async (req, res) => {
     try {
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-      const { trackingId, fingerprint, deviceType, browser, os, referrer, landingPage, userAgent, vpnSignals } = req.body;
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const { trackingId, vpnSignals } = body;
+      const { fingerprint, deviceType, browser, os, referrer, landingPage, userAgent } = vpnTrackFields(body);
       if (!trackingId) return res.status(400).json({ message: "Missing trackingId" });
+      if (typeof trackingId !== "string" || trackingId.length > VPN_TRACK_ID_MAX) return res.status(204).end();
+
+      const ip = visitorIp(req);
+      if (!vpnTrackIpLimit.allow(ip, Date.now())) {
+        res.setHeader("Retry-After", "60");
+        return res.status(429).json({ blocked: false, reason: "rate_limited" });
+      }
 
       const domain = await storage.getTrackedDomainByTrackingId(trackingId);
       if (!domain || !domain.isActive) return res.status(204).end();
+      if (!vpnTrackSiteLimit.allow(String(domain.id), Date.now())) {
+        res.setHeader("Retry-After", "60");
+        return res.status(429).json({ blocked: false, reason: "rate_limited" });
+      }
 
-      const ip = visitorIp(req);
-
-      const ua = userAgent || req.headers["user-agent"] || "";
+      const ua = userAgent || String(req.headers["user-agent"] || "").slice(0, 500);
 
       if (isCrawler(ua)) {
         return res.json({ blocked: false, reason: "crawler" });
@@ -5384,6 +5465,9 @@ function main() {
       }
 
       if (typeof clientEmail !== "string" || !z.string().email().safeParse(clientEmail.trim()).success) return res.status(400).json({ message: "Valid client email required" });
+      // "Schedule for later" with a time that has already passed is refused rather than sent on the spot
+      // (a minute of slack for the click itself).
+      if (scheduledFor && !(new Date(scheduledFor).getTime() > Date.now() - 60_000)) return res.status(400).json({ message: "That time has already passed. Pick a later time, or turn off Schedule to send now." });
       if (await isReviewSuppressed(user.id, clientEmail)) return res.status(409).json({ message: "This recipient has unsubscribed from your review requests. Only the customer can resubscribe." });
 
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
@@ -5427,7 +5511,9 @@ function main() {
       if (await hiddenFromReviews(user.id, crmLink.crmOrgId, crmLink.crmCustomerId, String(clientEmail))) {
         return res.status(409).json({ message: "This client is hidden from review requests. Unhide them under Ready to ask to send one." });
       }
-      const uploadedPhotos = Array.isArray(photos) ? photos : [];
+      // Uploaded and Media Library photos only: these become image and download links on the public review page.
+      const uploadedPhotos = cleanReviewPhotos(photos);
+      if (!uploadedPhotos) return res.status(400).json({ message: "One of the attached photos could not be used. Remove it and attach it again." });
       if (uploadedPhotos.length + (crmLink.photos?.length ?? 0) > HOMEOWNER_PICK_MAX) return res.status(400).json({ message: `Up to ${HOMEOWNER_PICK_MAX} photos per review request.` });
 
       const token = randomUUID();
@@ -5462,7 +5548,16 @@ function main() {
         // Customer-facing link: always the configured public origin, never the request host —
         // a request sent from the CRM portal host would land the customer on the sign-in screen.
         const baseUrl = canonicalAppOrigin();
-        await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
+        try {
+          await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
+        } catch (sendErr: any) {
+          // A send that may have reached the customer keeps its row (their link must keep working).
+          if (sendErr?.ambiguous) throw sendErr;
+          // Nothing went out, so nothing is kept as "sent": the owner can press Send again without a duplicate.
+          logError("Review request email failed:", sendErr);
+          await storage.permanentlyDeleteReviewRequest(request.id).catch((e) => logError("Review request cleanup failed:", e));
+          return res.status(502).json({ message: "The email could not be sent. Check the address and try again." });
+        }
 
         const reminderSettings = await storage.getReminderSettings(user.id);
         // Reminders are a Team-and-up feature: a plan without the module sends the

@@ -53,6 +53,7 @@
 import type { Express, Request, Response } from "express";
 import dns from "node:dns/promises";
 import { pool } from "./db";
+import { ADMIN_EMAILS } from "./admin";
 import { visitorIp, edgeGeo, normalizeBlockedIp, isPublicIpv4 } from "./route-guards";
 import { isPortalHost, isClientHost, requestHost } from "./site-context";
 import { banIp, boundedIntel, isLandingBanned, lookupIntel, rangeHit, startAdsIntel, type PrivacyIntel, type RangeHit } from "./ads-landing-intel";
@@ -184,8 +185,12 @@ async function excludeFromAds(ip: string, reason: string): Promise<void> {
     // A private or reserved IPv4 (a proxy hop, a test) is never an exclusion; IPv6 is taken as given.
     if (!clean || (!clean.includes(":") && !isPublicIpv4(clean))) return;
     const domain = String(process.env.ADS_LP_DOMAIN || "constructhub.us").toLowerCase();
+    // Any account can add any domain to Click Guard, so the platform's own entry (a platform admin's) comes
+    // first: a customer who registers this domain does not receive the ad doors' exclusions ahead of it.
     const { rows: [site] } = await pool.query(
-      `SELECT id FROM tracked_domains WHERE lower(domain) = $1 AND is_active ORDER BY id LIMIT 1`, [domain]);
+      `SELECT d.id FROM tracked_domains d LEFT JOIN users u ON u.id = d.user_id
+        WHERE lower(d.domain) = $1 AND d.is_active
+        ORDER BY (lower(u.email) = ANY($2::text[])) DESC NULLS LAST, d.id LIMIT 1`, [domain, ADMIN_EMAILS]);
     if (!site) return; // no Click Guard site for this domain yet: the hit is still in ads_lp_hits
     await pool.query(
       `INSERT INTO blocked_ips (domain_id, ip_address, reason, source)

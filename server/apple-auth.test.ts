@@ -78,7 +78,7 @@ describe("POST /api/auth/apple", () => {
       child.once("message", (m: any) => { clearTimeout(t); resolve(`http://127.0.0.1:${m.port}`); });
       child.once("exit", () => { clearTimeout(t); reject(Error(logs)); });
     });
-    const { rows: [u] } = await pool.query("INSERT INTO users(email,email_verified) VALUES($1,false) RETURNING id", [emails[1]]);
+    const { rows: [u] } = await pool.query("INSERT INTO users(email,email_verified,password_hash,verification_token) VALUES($1,false,'set-by-a-stranger','pending') RETURNING id", [emails[1]]);
     existingId = u.id;
   }, 40000);
 
@@ -114,8 +114,9 @@ describe("POST /api/auth/apple", () => {
     const r = await signIn(subs[1], emails[1]);
     expect(r.res.status).toBe(200);
     expect((await me(r.cookie)).id).toBe(existingId);
-    const { rows: [row] } = await pool.query("SELECT email_verified FROM users WHERE id=$1", [existingId]);
-    expect(row.email_verified).toBe(true);
+    const { rows: [row] } = await pool.query("SELECT email_verified, password_hash, verification_token FROM users WHERE id=$1", [existingId]);
+    // The account was never verified, so whoever set its password was never proven to own the email: it goes.
+    expect(row).toEqual({ email_verified: true, password_hash: null, verification_token: null });
   });
 
   it("re-verifies only with the Apple ID linked to the signed-in account", async () => {
@@ -123,6 +124,10 @@ describe("POST /api/auth/apple", () => {
     expect((await signIn(subs[1], emails[1], { cookie: login.cookie, purpose: "reauth" })).res.status).toBe(200);
     expect((await signIn(subs[0], emails[0], { cookie: login.cookie, purpose: "reauth" })).res.status).toBe(403);
     expect((await signIn(subs[1], emails[1], { purpose: "reauth" })).res.status).toBe(401);
+    // With two-step sign-in on, the Apple ID alone does not re-verify.
+    await pool.query("UPDATE users SET totp_enabled=true WHERE id=$1", [existingId]);
+    expect((await signIn(subs[1], emails[1], { cookie: login.cookie, purpose: "reauth" })).res.status).toBe(403);
+    await pool.query("UPDATE users SET totp_enabled=false WHERE id=$1", [existingId]);
   });
 
   it("refuses an unverified email and a closed account", async () => {

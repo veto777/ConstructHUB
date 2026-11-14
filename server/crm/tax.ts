@@ -108,6 +108,15 @@ export function divisionTaxRates(customFields: unknown): DivisionTaxRates | null
 /** 920 → "9.2%", 888 → "8.88%", 0 → "0%". */
 export const fmtBps = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
 const fmtPct = (pct: number) => `${Number(pct.toFixed(4))}%`;
+/**
+ * The official rate as the label prints it. An estimate stores whole basis points, so a published rate with more
+ * decimals (NJ 6.625%) is charged at the nearest 0.01% (6.63%): the label then leads with the rate actually charged
+ * and names the published one, instead of printing a rate the estimate does not use (audit 08 #2).
+ */
+const officialRateLabel = (off: OfficialRate) => {
+  const bps = clampBps(off.rateBps);
+  return Math.abs(bps - off.ratePct * 100) < 1e-6 ? fmtPct(off.ratePct) : `${fmtBps(bps)} (rounded from ${fmtPct(off.ratePct)})`;
+};
 
 /** "No tax on job" → "no tax on job", but "GET on contractor" / "T&M …" keep their capitals. */
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
@@ -174,12 +183,12 @@ export function resolveTaxRateBps(args: {
     if (args.addressLookupMissed && off.matchedBy !== "address") {
       return {
         ...base, bps: clampBps(off.rateBps), source: "official", official: off, fallbackReason: "address_lookup_failed",
-        label: `${where} · ${fmtPct(off.ratePct)} — estimate: city rate (${off.source}, ${off.periodLabel}); the street address couldn't be matched with WA DOR — check`,
+        label: `${where} · ${officialRateLabel(off)} — estimate: city rate (${off.source}, ${off.periodLabel}); the street address couldn't be matched with WA DOR — check`,
       };
     }
     return {
       ...base, bps: clampBps(off.rateBps), source: "official", official: off,
-      label: `${where} · ${fmtPct(off.ratePct)} (${off.source}, ${off.periodLabel})${varies}${dependsSuffix(treatment)}`,
+      label: `${where} · ${officialRateLabel(off)} (${off.source}, ${off.periodLabel})${varies}${dependsSuffix(treatment)}`,
     };
   }
 

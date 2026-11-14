@@ -1,5 +1,6 @@
 import { existsSync } from "fs";
 import { chromium, type Browser } from "playwright-core";
+import { isGoogleMapsPageUrl } from "./google-url-resolver";
 
 // Same rule as server/scraper.ts: CHROMIUM_PATH wins, the Replit-era Nix build
 // only where it exists, otherwise playwright-core's managed headless build.
@@ -38,8 +39,10 @@ export interface ScrapedBusiness {
 export async function scrapeGoogleMapsBusiness(opts: { name?: string | null; mapsUrl?: string | null; kgmid?: string | null }): Promise<ScrapedBusiness | null> {
   const { name, mapsUrl, kgmid } = opts;
   let url: string;
-  if (mapsUrl && /google\.\w+\/maps/i.test(mapsUrl)) {
-    url = mapsUrl;
+  // Host-allowlisted Google Maps pages only (never a substring match): this URL
+  // is opened in a server-side browser, so anything else would be an SSRF.
+  if (mapsUrl && isGoogleMapsPageUrl(mapsUrl)) {
+    url = mapsUrl.trim();
   } else if (name) {
     const q = encodeURIComponent(name);
     url = kgmid

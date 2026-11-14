@@ -66,6 +66,13 @@ export type SalesTaxSource = {
 /** Percent → basis points as the estimate stores them (integer; 8.875% → 888). */
 export const pctToBps = (pct: number): number => Math.round(pct * 100);
 
+/**
+ * A published table whose effective date (YYYY-MM-DD) is still ahead of today. States post next quarter's files
+ * before the quarter starts; loading one early would charge next quarter's rates now (audit 08 #9).
+ */
+export const notYetInForce = (effectiveDate: string, now: Date = new Date()): boolean =>
+  effectiveDate > now.toISOString().slice(0, 10);
+
 /** "Q4 2026" for a YYYY-MM-DD effective date. */
 export function quarterLabel(effectiveDate: string): string {
   const [y, m] = effectiveDate.split("-").map(Number);

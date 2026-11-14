@@ -61,12 +61,19 @@ app.use(USER_REPORT_PATH, express.json({ limit: USER_REPORT_BODY_LIMIT }));
 import { registerFormSyncBodyParser } from "./crm/leads";
 registerFormSyncBodyParser(app);
 app.use("/api/ads", express.json({ limit: "512kb" }));
+// The public Click Guard collector: one small beacon per page view (audit 2026-11-14 H4).
+import { CLICK_TRACK_BODY_LIMIT } from "./click-guard-collector";
+app.use("/api/click-guard/track", express.json({ limit: CLICK_TRACK_BODY_LIMIT }));
 // Bounded JSON for the GBP posts queue, the SEO suite and mail alerts (review w3-r2 L2): every field is zod-bounded
 // afterwards, but the catch-all below would parse 50 MB into memory first. Sized to the largest valid body: SEO lists
 // and keyword imports take up to 1,000 rows; a Google queue batch up to 100 posts of 1,500 characters.
 app.use("/api/seo", express.json({ limit: "1mb" }));
 app.use("/api/gbp/content", express.json({ limit: "512kb" }));
 app.use("/api/mail-alerts", express.json({ limit: "256kb" }));
+// VPN Shield's tracking beacon is anonymous and firewall-exempt (audit 08 #1): a real page view sends a few
+// hundred bytes, so it is capped here before the 50 MB parser below can read it into memory.
+import { VPN_TRACK_BODY_LIMIT } from "./vpn-mode";
+app.use("/api/vpn-shield/track", express.json({ limit: VPN_TRACK_BODY_LIMIT }));
 app.use(
   express.json({
     limit: "50mb",
@@ -91,7 +98,7 @@ export function log(message: string, source = "express") {
 
 // The issue desk: a 500 a route answered by itself is recorded when the response finishes.
 import { watchHandledFailures, recordUnhandledError, recordProcessFailure } from "./ops/server-errors";
-import { logError, isBodyParserError } from "./ops/log";
+import { logError, unhandledErrorMessage } from "./ops/log";
 app.use(watchHandledFailures);
 
 // The request log (server/request-log.ts): method, path, status, duration, request id. Never a response body in
@@ -161,8 +168,8 @@ process.on("unhandledRejection", (reason) => {
       const status = typeof err.code === "string" && err.code.startsWith("LIMIT_") ? 413 : (err.status || err.statusCode || 500);
       // A body-parser error carries the raw request body (err.body) and quotes it in its message:
       // the journal gets its type/status/length only (ops/log.ts), the client a fixed sentence.
-      const isBodyError = isBodyParserError(err);
-      const message = isBodyError ? "The request body could not be read as JSON." : (err.message || "Internal Server Error");
+      // A 5xx answers a fixed sentence too: the detail (a Postgres message, a vendor's text) is logged below, not sent.
+      const message = unhandledErrorMessage(err, status);
 
       logError("Internal Server Error:", err);
       // The issue desk: any 5xx that reached this handler (route + method + error identity).

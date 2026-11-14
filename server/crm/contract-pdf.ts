@@ -21,6 +21,7 @@
  * 'company · license · website' band and a 'Page X of Y' number.
  */
 import { isSameTerms } from "@shared/terms-dedupe";
+import { hasPayInFull } from "@shared/estimate-totals";
 import PDFDocument from "pdfkit";
 
 export const BRAND_ORANGE = "#F97316";
@@ -428,7 +429,9 @@ export async function buildContractPdf(
   doc.moveDown(0.3);
   totalRow("Approved total", money(approvedTotal), { bold: true, big: true });
   // Never more than the signed total (shared/estimate-totals.ts amountDueCents).
-  if (e.depositCents) totalRow("Deposit due", money(Math.min(e.depositCents, approvedTotal)));
+  // A pay-in-full signature is charged the whole signed total, so the contract must not print a deposit.
+  if (hasPayInFull(e.selectedDiscounts)) totalRow("Due now (paid in full)", money(approvedTotal));
+  else if (e.depositCents) totalRow("Deposit due", money(Math.min(e.depositCents, approvedTotal)));
   doc.x = left; // leave the right-hand totals column before flowing text
 
   // ── Terms: the estimate's own terms first, then the org's standing ones.

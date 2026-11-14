@@ -103,7 +103,9 @@ function matchSku(line: FloorLine, index: PricebookIndex): PricedRow | null {
 /** The per-unit floor for one line, in cents. 0 means "no floor". */
 export function floorCentsForLine(line: FloorLine, index: PricebookIndex, lock: PriceFloorLock): number {
   const sku = matchSku(line, index);
-  const cost = line.unitCostCents ?? sku?.costCents ?? null;
+  // A price-book line floors on the price book's cost: the cost sent with the line comes from the request, and
+  // a rep could otherwise lower the floor by typing a lower cost. Lines not in the price book use their own.
+  const cost = sku?.costCents ?? line.unitCostCents ?? null;
   if (lock.floorBps != null && cost != null && cost > 0) {
     return Math.ceil((cost * (10_000 + lock.floorBps)) / 10_000);
   }

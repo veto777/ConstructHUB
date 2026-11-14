@@ -21,6 +21,7 @@ competitorScanActions.post("/:id/cancel", async (req, res) => {
   }
   try {
     const scanId = parseInt(req.params.id);
+    if (!Number.isInteger(scanId)) return res.status(404).json({ message: "Scan not found" });
     const outcome = await cancelCompetitorScan(authed.id, scanId, systemClock.now());
     if (!("ok" in outcome)) return res.status(outcome.status).json({ message: outcome.message });
     res.json({ success: true });

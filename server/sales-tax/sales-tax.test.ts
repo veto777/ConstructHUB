@@ -10,7 +10,7 @@ import { cityKey } from "./city-key";
 import { parseCsv, toPct, titleCase } from "./fetch-util";
 import { parseWaCsv, parseWaPeriod } from "./sources/wa";
 import { pickCityRow, contentHash, packResult, unpackResult, type BundledSalesTaxFile } from "./store";
-import { pctToBps, quarterLabel } from "./types";
+import { notYetInForce, pctToBps, quarterLabel } from "./types";
 import { parseWaAddressXml } from "./wa-address";
 import { CONSTRUCTION_TAX_TREATMENT, constructionTaxTreatment } from "@shared/construction-tax-treatment";
 
@@ -180,5 +180,14 @@ describe("construction tax treatment", () => {
     expect(constructionTaxTreatment("TX")!.dependsOn).toContain("residential_vs_commercial");
     for (const s of ["OR", "NH", "MT", "DE"]) expect(constructionTaxTreatment(s)?.treatment).toBe("not_taxable");
     expect(constructionTaxTreatment("ZZ")).toBeNull();
+  });
+});
+
+// Audit 08 #9: next quarter's files are posted before the quarter starts; the refresh must not load them early.
+describe("notYetInForce", () => {
+  it("holds back a table until its effective date", () => {
+    expect(notYetInForce("2027-01-01", new Date("2026-12-05T08:00:00Z"))).toBe(true);
+    expect(notYetInForce("2027-01-01", new Date("2027-01-01T00:00:00Z"))).toBe(false);
+    expect(notYetInForce("2026-10-01", new Date("2026-12-05T08:00:00Z"))).toBe(false);
   });
 });

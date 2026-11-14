@@ -20,13 +20,14 @@
 import { registerWorker, workerInterval } from "../workers";
 import { BotTellError, assertNoBotTell } from "../outbound-guard";
 import { pool } from "../db";
-import { getFromR2, isR2Key } from "../r2";
+import { getFromR2 } from "../r2";
 import { PRIMARY_DOMAIN } from "../site-context";
 import { PRESS_TIER_LABEL, PRESS_WIRE_TIER_NAME, PRESS_PATH, PRESS_STATUS_LABELS, type PressReport, type PressTier } from "@shared/press";
-import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, wireConfigured, type Inbound, type OutgoingAttachment } from "./mailbox";
+import { fetchSince, isWireSender, mailboxConfig, mailboxConfigured, sendMail, wireConfigured, type Inbound, type OutgoingAttachment } from "./mailbox";
 import * as store from "./store";
 import { readWireReply, releaseAsText, reviseRelease } from "./writer";
 import { checkRelease } from "./guidelines";
+import { PRESS_PHOTO_KEY } from "./draft";
 import { runAutopilot } from "./autopilot";
 import { sendDue } from "./send";
 import { notifyUser } from "../account-events";
@@ -44,7 +45,11 @@ export const workerDeps = { fetchSince, sendMail, readWireReply, reviseRelease, 
 
 const CODE_RE = /CH-PR-[0-9A-F]{6}/i;
 const siteBase = () => `https://${PRIMARY_DOMAIN}`;
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/** One line of a customer email as HTML: every character escaped, plain http(s) links made clickable. */
+export const lineHtml = (l: string) => l.split(/(https?:\/\/[^\s<>"]+)/).map((part, i) => (i % 2 ? `<a href="${esc(part)}" style="color:#F97316">${esc(part)}</a>` : esc(part))).join("");
+/** Photos are only ever stored by the upload route, under press/photos/: no other object is sent to the wire. */
+export const isPressPhotoKey = (key: string) => PRESS_PHOTO_KEY.test(key);
 const tierName = (t: PressTier) => PRESS_TIER_LABEL[t];
 
 async function r2Buffer(key: string): Promise<Buffer | null> {
@@ -110,8 +115,8 @@ export async function submitReady(): Promise<{ sent: number; held: number; faile
       assertNoBotTell({ to: mailboxConfig().wireTo, subject, body }, "hard");
       const attachments: OutgoingAttachment[] = [];
       for (const p of r.input.photos.slice(0, 6)) {
-        const key = p.key || (isR2Key(p.url.replace(/^\/api\/files\//, "")) ? p.url.replace(/^\/api\/files\//, "") : "");
-        const buf = key ? await r2Buffer(key) : null;
+        const key = p.key || p.url.replace(/^\/api\/files\//, "");
+        const buf = isPressPhotoKey(key) ? await r2Buffer(key) : null;
         if (buf) attachments.push({ filename: `${r.code}-${attachments.length + 1}.${(key.match(/\.(\w+)$/)?.[1] ?? "jpg")}`, content: buf });
       }
       const prior = (await store.threadFor(r.id)).filter((m) => m.direction === "out");
@@ -162,12 +167,16 @@ export async function readInbox(): Promise<{ read: number; unmatched: number }> 
     for (const m of messages) {
       const release = await releaseFor(m);
       const auto = m.autoSubmitted && !/^no$/i.test(m.autoSubmitted);
+      // The release code is shown to the customer, so it proves nothing about who wrote the email: only the wire's
+      // own address is acted on. Anyone else's email about a release is kept for the owner to read.
+      const stranger = !!release && !isWireSender(m.fromEmail);
       const saved = await store.saveMessage({
         messageId: m.messageId, threadKey: m.threadKey, direction: "in", releaseId: release?.id ?? null, fromEmail: m.fromEmail, fromName: m.fromName, toEmail: m.to,
         subject: m.subject, body: m.body, attachments: m.attachments.map(({ text: _t, ...a }) => a), receivedAt: m.date,
-        status: auto ? "ignored" : release ? "new" : "needs_owner", reason: auto ? "Automatic message" : release ? null : "No release reference in this email",
+        status: auto ? "ignored" : stranger ? "needs_owner" : release ? "new" : "needs_owner",
+        reason: auto ? "Automatic message" : stranger ? "Not from the wire's address: read it before acting on it" : release ? null : "No release reference in this email",
       });
-      if (saved) { read++; if (!release && !auto) unmatched++; }
+      if (saved) { read++; if ((!release || stranger) && !auto) unmatched++; }
       if (saved && m.attachments.some((a) => a.text)) await store.setMessage(saved.id, { reading: { attachmentText: m.attachments.map((a) => a.text ?? "").join("\n\n").slice(0, 60_000) } });
       lastUid = Math.max(lastUid, m.uid);
     }
@@ -186,7 +195,7 @@ async function emailCustomer(r: store.ReleaseRow, subject: string, lines: string
   const to = r.input.contactEmail;
   if (!to) return;
   const body = [...lines, "", `Track it: ${releaseLink(r)}`].join("\n");
-  const html = lines.map((l) => (l ? `<p style="margin:0 0 10px">${l.replace(/(https?:\/\/[^\s<]+)/g, (u) => `<a href="${esc(u)}" style="color:#F97316">${esc(u)}</a>`)}</p>` : "")).join("") + `<p style="margin:16px 0 0"><a href="${releaseLink(r)}" style="display:inline-block;background:#F97316;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700">Open your release</a></p>`;
+  const html = lines.map((l) => (l ? `<p style="margin:0 0 10px">${lineHtml(l)}</p>` : "")).join("") + `<p style="margin:16px 0 0"><a href="${releaseLink(r)}" style="display:inline-block;background:#F97316;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700">Open your release</a></p>`;
   try {
     const id = await workerDeps.sendMail({ to, subject, body, html, attachments });
     await store.saveMessage({ messageId: id, threadKey: null, direction: "out", releaseId: r.id, fromEmail: mailboxConfig().user || "support", fromName: "ConstructHUB Press Team", toEmail: to, subject, body, attachments: [], receivedAt: new Date(), status: "applied" });
@@ -216,6 +225,10 @@ export async function applyReplies(): Promise<{ applied: number; held: number; f
       } else if (reading.kind === "approved") {
         await store.updateRelease(r.id, { wire_notes: null, last_error: null });
         await store.setMessage(m.id, { status: "applied", reason: "Approved, awaiting the live link" }); out.applied++;
+      } else if (reading.kind === "changes" && r.status !== "submitted") {
+        // Changes are asked of a release that is with the wire. One that is live, reported, cancelled or back with
+        // the customer is never pulled back to "changes requested" (which can be cancelled for its credit).
+        await store.setMessage(m.id, { status: "needs_owner", reason: `Asks for changes, but the release is ${r.status.replace("_", " ")}` }); out.held++;
       } else if (reading.kind === "changes") {
         const notes = reading.notes || reading.summary;
         let text = r.text;

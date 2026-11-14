@@ -25,7 +25,7 @@ import {
   crmNotificationChannel,
   crmClientTokens,
 } from "@shared/schema";
-import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
+import { and, eq, desc, asc, sql, isNull, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
@@ -56,6 +56,7 @@ import { autoTitleFrom } from "@shared/estimate-draft";
 import { lineBases, optionDocument } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
+import { clearingCents } from "./payment-reconcile";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
@@ -94,8 +95,10 @@ async function senderReplyTo(createdByMemberId: string | null | undefined, fallb
   return fallback || undefined;
 }
 
+// Same rule as lead-capture.ts: the left-most X-Forwarded-For is whatever the
+// sender wrote, so it is never trusted (req.ip already honours "trust proxy").
 const clientIp = (req: any) =>
-  String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
+  String(req.headers["cf-connecting-ip"] || req.ip || "")
     .split(",")[0].trim().slice(0, 60);
 
 /**
@@ -627,9 +630,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }
 
     // Server-side paid flag — the client must never infer "paid" from the
-    // ?paid=1 redirect parameter alone.
+    // ?paid=1 redirect parameter alone. A deposit with a small refund on it
+    // ("partially_refunded") is still paid: the page must not offer it again.
     const settledPayments = await db.select({ id: crmPayments.id }).from(crmPayments)
-      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+      .where(and(eq(crmPayments.estimateId, est.id), inArray(crmPayments.status, ["succeeded", "partially_refunded"]))).limit(1);
 
     // The client must always see WHO their salesperson is and how to reach
     // them — the estimate writer first, the project's sales rep as fallback.
@@ -693,7 +697,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       preview: preview || undefined, // read-only: the page hides approve/pay
       answerBlock: answerBlock ?? undefined,
       salesRep,
-      estimate: { ...view.estimate, paid: settledPayments.length > 0 },
+      // paymentProcessing: a bank transfer finished checkout and is still clearing. The page must say so (and
+      // hide Pay) from the server's word, not only from the ?paid=1 redirect that a reopened link no longer has.
+      estimate: { ...view.estimate, paid: settledPayments.length > 0, paymentProcessing: !settledPayments.length && (await clearingCents({ estimateId: est.id })) > 0 },
       // A tiered bundle shows what THESE lines earn (or "not available" + why); the approve route recomputes it.
       // basePercentBps + rule let the page re-price a tiered offer for the option being viewed or the scopes ticked
       // (shared effectiveOffer, the same function the server uses on approve).
@@ -821,7 +827,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         ? { approvedTotalCents: approval.totals.totalCents, selectedDiscounts: approval.selections }
         : {}),
       updatedAt: new Date(),
-    }).where(eq(crmEstimates.id, est.id)).returning();
+    }).where(and(eq(crmEstimates.id, est.id), isNull(crmEstimates.approvedAt), isNull(crmEstimates.declinedAt))).returning();
+    // A second response that raced this one (double tap, two signers) lost:
+    // nothing below (contract, stage, webhooks) may run twice.
+    if (!row) return res.status(409).json({ message: "This estimate has already been responded to." });
 
     await logEvent(est.orgId, est.id, approve ? "approved" : "declined", "client", req, {
       signatureName: parsed.data.signatureName, reason: parsed.data.reason,
@@ -1688,7 +1697,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }));
 
     res.json({
-      customer: { displayName: cust.displayName, email: cust.email, phone: cust.phone },
+      // Name only: this link needs no sign-in, and the page shows nothing else of the client.
+      customer: { displayName: cust.displayName },
       company: {
         name: org.name, phone: org.phone, email: org.email,
         website: org.website, logoUrl: org.logoUrl,
@@ -1697,7 +1707,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       },
       estimates: estimates.map((e) => ({
         id: e.id, number: e.number, title: e.title, status: e.status,
-        totalCents: e.totalCents, sentAt: e.sentAt, approvedAt: e.approvedAt,
+        // A signed estimate reads for what was signed (options and discounts picked at approval).
+        totalCents: e.approvedAt ? (e.approvedTotalCents ?? e.totalCents) : e.totalCents, sentAt: e.sentAt, approvedAt: e.approvedAt,
         declinedAt: e.declinedAt, expiresAt: e.expiresAt,
         link: `/e/${e.publicToken}`,
       })),
@@ -2192,12 +2203,16 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         taxCents: inv.taxCents, totalCents: inv.totalCents,
         retainageCents: inv.retainageCents, paidCents: inv.paidCents, refundedCents: refundSummary.refundedCents,
         dueCents: due, dueAt: inv.dueAt, paidAt: inv.paidAt, notes: inv.notes,
+        // A bank transfer that finished checkout and is still clearing: not on paidCents yet, but the page must
+        // not offer the same balance again (a reopened email link has no ?paid=1 to say so).
+        processingCents: await clearingCents({ invoiceId: inv.id }),
         createdAt: inv.createdAt,
         // Footer, warranty and terms as copied onto this invoice (doc-defaults.ts).
         ...invoiceDocText(inv, org),
       },
       items: items.map((i) => ({
-        id: i.id, name: i.name, description: i.description, unit: i.unit,
+        // kind: a "discount" line is stored as a positive price; the page must show it as money off.
+        id: i.id, kind: i.kind, name: i.name, description: i.description, unit: i.unit,
         quantityMilli: i.quantityMilli, unitPriceCents: i.unitPriceCents,
         lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
       })),
