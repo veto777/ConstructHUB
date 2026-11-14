@@ -61,6 +61,9 @@ app.use(USER_REPORT_PATH, express.json({ limit: USER_REPORT_BODY_LIMIT }));
 import { registerFormSyncBodyParser } from "./crm/leads";
 registerFormSyncBodyParser(app);
 app.use("/api/ads", express.json({ limit: "512kb" }));
+// The public Click Guard collector: one small beacon per page view (audit 2026-11-14 H4).
+import { CLICK_TRACK_BODY_LIMIT } from "./click-guard-collector";
+app.use("/api/click-guard/track", express.json({ limit: CLICK_TRACK_BODY_LIMIT }));
 // Bounded JSON for the GBP posts queue, the SEO suite and mail alerts (review w3-r2 L2): every field is zod-bounded
 // afterwards, but the catch-all below would parse 50 MB into memory first. Sized to the largest valid body: SEO lists
 // and keyword imports take up to 1,000 rows; a Google queue batch up to 100 posts of 1,500 characters.
