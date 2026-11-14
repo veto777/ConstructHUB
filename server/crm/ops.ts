@@ -1190,6 +1190,8 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (!org) return res.status(404).json({ message: "Organization not found" });
     if (!await requireCrmFeature(res, org.ownerUserId, "jobCosting")) return;
     if (co.approvedAt || co.declinedAt) return res.status(409).json({ message: "Already responded to." });
+    // A voided change order was withdrawn by the contractor: its old link must not be signable.
+    if (co.status === "void") return res.status(409).json({ message: "This change order has been withdrawn." });
     const approve = parsed.data.decision === "approve";
     if (approve && !parsed.data.signatureName) return res.status(400).json({ message: "Please type your name to approve." });
     const [row] = await db.update(crmChangeOrders).set({
@@ -1198,7 +1200,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       declinedAt: approve ? null : new Date(),
       signatureName: approve ? parsed.data.signatureName ?? null : null,
       updatedAt: new Date(),
-    }).where(eq(crmChangeOrders.id, co.id)).returning();
+      // Only the first answer writes: two answers at once (a double click) must not both land.
+    }).where(and(eq(crmChangeOrders.id, co.id), isNull(crmChangeOrders.approvedAt), isNull(crmChangeOrders.declinedAt),
+      sql`${crmChangeOrders.status} <> 'void'`)).returning();
+    if (!row) return res.status(409).json({ message: "Already responded to." });
     queueCrmEvent(co.orgId, approve ? "changeorder.approved" : "changeorder.declined", {
       changeOrderId: co.id, projectId: co.projectId, number: co.number, title: co.title,
       amountCents: co.amountCents, scheduleImpactDays: co.scheduleImpactDays ?? null,
