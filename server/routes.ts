@@ -817,6 +817,7 @@ export async function registerRoutes(
   // One county's permit portals (display link fields) — a county drill-down.
   app.get("/api/databases/county/:countyId", requirePlatformAccess, async (req, res) => {
     const countyId = parseInt(String(req.params.countyId));
+    if (isNaN(countyId)) return res.status(400).json({ message: "Invalid county id" });
     const databases = await storage.getDatabasesByCounty(countyId);
     res.json(databases.map(governmentPermitForDisplay));
   });
@@ -1013,6 +1014,20 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Automated search is not supported for this portal. Open the official portal to search." });
       }
 
+      // The Databases dialog still sends the older scraper names. A registry adapter knows "permit" and "company",
+      // and one that does not offer the chosen search fails at once, after a monthly search was already used
+      // (audit 08 #6): translate the name, and refuse an unsupported type before the quota is touched.
+      let scrapeType: string = searchType || "address";
+      const registry = await import("./scrapers/registry");
+      const adapter = registry.getAdapterFor({ platform: db.platform, jurisdiction: db.jurisdiction });
+      if (adapter && !registry.isLegacyAdapter(adapter)) {
+        scrapeType = ({ permit_number: "permit", company_name: "company" } as Record<string, string>)[scrapeType] ?? scrapeType;
+        const supported = adapter.capabilities.search as string[];
+        if (!supported.includes(scrapeType)) {
+          return res.status(400).json({ message: `This portal cannot be searched by ${scrapeType.replace(/_/g, " ")}. It supports: ${supported.join(", ") || "no live search"}.` });
+        }
+      }
+
       if (!(await reserveMonthlyQuota(req, res, "searches"))) return;
       const query = await storage.createSearchQuery({
         userId: req.user!.id,
@@ -1026,7 +1041,7 @@ export async function registerRoutes(
       const url = db.searchUrl || db.portalUrl!;
       const platform = db.platform!;
 
-      scrapeByPlatform(platform, url, searchTerm, searchType || "address", db.id, db.name, query.id, jobId, db.jurisdiction)
+      scrapeByPlatform(platform, url, searchTerm, scrapeType, db.id, db.name, query.id, jobId, db.jurisdiction)
         .catch((err) => logError("Scrape error:", err));
 
       res.json({ jobId, queryId: query.id, message: "Scrape started" });
@@ -1146,6 +1161,7 @@ export async function registerRoutes(
 
   app.get("/api/search-results/:queryId", async (req, res) => {
     const queryId = parseInt(req.params.queryId);
+    if (isNaN(queryId)) return res.status(400).json({ message: "Invalid search id" });
     if (!(await canReadQuery(req, queryId))) return res.status(404).json({ message: "Search not found" });
     const results = await storage.getSearchResults(queryId);
     res.json(results);
@@ -1293,6 +1309,7 @@ export async function registerRoutes(
   // link fields (portalUrl/searchUrl/linkStatus/lastVerifiedAt).
   app.get("/api/property-appraisers/county/:countyId", requireModule("propertyRecords"), async (req, res) => {
     const countyId = parseInt(String(req.params.countyId));
+    if (isNaN(countyId)) return res.status(400).json({ message: "Invalid county id" });
     const appraisers = await storage.getPropertyAppraisersByCounty(countyId);
     res.json(appraisers.map(governmentLinksForDisplay));
   });
@@ -1339,6 +1356,7 @@ export async function registerRoutes(
 
   app.get("/api/property-records/:countyId", requireModule("propertyRecords"), async (req, res) => {
     const countyId = parseInt(String(req.params.countyId));
+    if (isNaN(countyId)) return res.status(400).json({ message: "Invalid county id" });
     const records = await storage.getPropertyRecords(countyId);
     res.json(records);
   });
