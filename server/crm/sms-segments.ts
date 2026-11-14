@@ -42,3 +42,19 @@ export function smsSegments(body: string): number {
   const { single, multi } = SMS_SEGMENT_SIZES[encoding];
   return units <= single ? 1 : Math.ceil(units / multi);
 }
+
+/**
+ * Typographic punctuation swapped for its plain GSM-7 twin before a text is
+ * metered and sent. One em dash or curly quote turns the whole text UCS-2
+ * (70 per segment instead of 160), so a system template with a dash in it
+ * cost two or three times the segments. Nothing else is touched: an emoji or
+ * an accented letter the sender typed stays as typed.
+ */
+export function gsmSafeText(body: string): string {
+  return body
+    .replace(/[\u2013\u2014\u2212]/g, "-")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ");
+}
