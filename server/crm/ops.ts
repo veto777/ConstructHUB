@@ -57,6 +57,10 @@ const METHOD_LABELS: Record<string, string> = {
   ach: "bank transfer (ACH)", card: "card", other: "another method",
 };
 
+/** Client names and invoice titles reach the CRM from lead forms and imports; escape before they enter email HTML. */
+const escHtml = (s?: string | null) =>
+  String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
+
 /** "$1,750.00" — the same formatting the UI uses, for server messages. */
 const usd = (cents: number) =>
   `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -146,8 +150,8 @@ async function notifyPaymentRecorded(
     await sendWithFallback({
       to: [...to].join(","),
       subject: `Payment received — ${amount} via ${via} from ${who} for invoice ${inv.number ?? ""}`.trim(),
-      html: `<p><strong>${amount}</strong> received via <strong>${via}</strong> from ${who}` +
-            ` for invoice <strong>${doc}</strong>${inv.title ? ` (${inv.title})` : ""}.</p>` +
+      html: `<p><strong>${amount}</strong> received via <strong>${escHtml(via)}</strong> from ${escHtml(who)}` +
+            ` for invoice <strong>${escHtml(doc)}</strong>${inv.title ? ` (${escHtml(inv.title)})` : ""}.</p>` +
             `<p>Recorded manually in ConstructHub CRM${recorder ? ` by <strong>${actorLabel(recorder).replace(/[&<>"]/g, "")}</strong>` : ""}.</p>`,
     } as any);
   }

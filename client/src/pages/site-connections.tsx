@@ -590,7 +590,10 @@ export function LocationSearchSummary({ locationId, businessName, hideWhenEmpty 
           />
         )}
         <p className="font-medium">
-          Google Search Console · property totals · last 30 days
+          Google Search Console · property totals
+          {s?.first_day && s?.last_day
+            ? ` · ${String(s.first_day)} to ${String(s.last_day)}`
+            : " · last 30 days"}
         </p>
         <p className="text-sm text-muted-foreground">
           {s
@@ -717,7 +720,9 @@ export default function SiteConnections({
     try {
       const r = await fn();
       await queryClient.invalidateQueries({
-        predicate: (q) => String(q.queryKey[0]).startsWith(base),
+        // The rank tracker's Search Console breakdown caches under /api/seo/sites/.../search-console/...
+        // with staleTime Infinity; disconnecting Google must drop it too, not only this tool's own keys.
+        predicate: (q) => String(q.queryKey[0]).startsWith(base) || String(q.queryKey[0]).includes("/search-console/"),
       });
       if (notifySuccess) toast({
         title,

@@ -67,7 +67,7 @@ export async function enqueueLocations(user: number, raw: unknown) {
   const b = bulkInput.parse(raw),
     ids = [...new Set(b.locationIds)];
   const { rows } = await pool.query(
-    `SELECT l.id,s.profile_snapshot,s.last_success FROM business_locations l
+    `SELECT l.id,l.business_name,s.profile_snapshot,s.last_success FROM business_locations l
     JOIN gbp_sync_status s ON s.location_id=l.id AND s.kind='profile' AND s.profile_snapshot IS NOT NULL AND s.last_success IS NOT NULL
     WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL AND l.id=ANY($2::int[])`,
     [user, ids],
@@ -75,7 +75,21 @@ export async function enqueueLocations(user: number, raw: unknown) {
   if (rows.length !== ids.length)
     throw new TypeError("Select owned, synced profiles");
   const records = rows.map((r) => {
-    const url = siteUrl(r.profile_snapshot.website || "");
+    // A synced profile can carry no usable website; name the location so the batch
+    // error says which ticked location to remove, instead of failing the whole batch
+    // with a generic 400.
+    const raw = r.profile_snapshot.website || "";
+    let url: string;
+    try {
+      url = siteUrl(raw);
+    } catch (e) {
+      const why = raw
+        ? (e as Error).message
+        : "No website on the synced profile.";
+      throw Object.assign(new Error(`${r.business_name}: ${why}`), {
+        status: 400,
+      });
+    }
     return {
       id: randomUUID(),
       url,

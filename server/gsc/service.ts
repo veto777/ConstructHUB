@@ -289,7 +289,7 @@ export async function locationSearchClicks(user: number, location: number) {
   const {
     rows: [r],
   } = await pool.query(
-    `SELECT a.external_id,sum(m.clicks) clicks,sum(m.impressions) impressions FROM edge_location_links l JOIN edge_assets a ON a.id=l.asset_id
+    `SELECT a.external_id,sum(m.clicks) clicks,sum(m.impressions) impressions,min(m.date) first_day,max(m.date) last_day FROM edge_location_links l JOIN edge_assets a ON a.id=l.asset_id
     JOIN gsc_analytics m ON m.asset_id=a.id AND m.dimension='date' AND m.date>=current_date-30
     JOIN business_locations b ON b.id=l.location_id AND b.user_id=l.user_id
     WHERE l.user_id=$1 AND l.location_id=$2 GROUP BY a.id ORDER BY a.id LIMIT 1`,

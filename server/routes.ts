@@ -259,12 +259,17 @@ export async function registerRoutes(
           ? [...new Set<string>(req.body.locations.map((l: any) => l?.gbpName).filter((n: unknown): n is string => typeof n === "string" && n.length > 0 && n.length <= 300))].slice(0, 100)
           : [];
         if (!names.length) return next(); // the import route validates the selection itself
-        // A listing adds a location unless it is already linked, or links in place to a Places-added row.
+        // A listing adds a location unless it is already linked, or links in place to a
+        // Places-added row (by place id) or a hand-typed row with the same name — the
+        // same cases importVerifiedLocations links without using a slot.
         const { rows: [r] } = await pool.query(
           `SELECT count(*)::int adding FROM unnest($2::text[]) n(name)
             WHERE NOT EXISTS (SELECT 1 FROM business_locations l WHERE l.user_id=$1 AND l.gbp_location_name=n.name)
               AND NOT EXISTS (SELECT 1 FROM agency_discovery d JOIN business_locations l ON l.user_id=d.user_id AND l.gbp_location_name IS NULL AND l.place_id=d.data->>'placeId'
-                               WHERE d.user_id=$1 AND d.location=n.name)`, [user.id, names]);
+                               WHERE d.user_id=$1 AND d.location=n.name)
+              AND NOT EXISTS (SELECT 1 FROM agency_discovery d JOIN business_locations l ON l.user_id=d.user_id AND l.gbp_location_name IS NULL AND l.place_id IS NULL
+                               WHERE d.user_id=$1 AND d.location=n.name
+                                 AND regexp_replace(lower(l.business_name),'[^a-z0-9]','','g')=regexp_replace(lower(d.data->>'businessName'),'[^a-z0-9]','','g'))`, [user.id, names]);
         const used = await locationCount(user.id);
         if (r.adding > 0 && !fitsLimit(ent.allowances!.locations, used, r.adding)) return void sendLocationLimit(res, ent, used, r.adding);
         next();
