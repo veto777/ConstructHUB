@@ -195,7 +195,7 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
     const [pay] = await db
       .select({
         count: sql<number>`count(*) filter (where ${crmPayments.status} = 'succeeded')::int`,
-        succeededCents: sql<number>`coalesce(sum(case when ${crmPayments.status} = 'succeeded' then ${crmPayments.amountCents} else 0 end), 0)::int`,
+        succeededCents: sql<number>`coalesce(sum(case when ${crmPayments.status} = 'succeeded' then ${crmPayments.amountCents} else 0 end), 0)::bigint`,
       })
       .from(crmPayments);
     const [{ n: betaUsers }] = await db
@@ -209,7 +209,7 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
       customers: await count(crmCustomers),
       estimates: await count(crmEstimates),
       invoices: await count(crmInvoices),
-      payments: { count: pay.count, succeededCents: pay.succeededCents },
+      payments: { count: pay.count, succeededCents: Number(pay.succeededCents) },
       betaUsers,
     });
   });
