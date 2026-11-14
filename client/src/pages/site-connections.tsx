@@ -717,7 +717,9 @@ export default function SiteConnections({
     try {
       const r = await fn();
       await queryClient.invalidateQueries({
-        predicate: (q) => String(q.queryKey[0]).startsWith(base),
+        // The rank tracker's Search Console breakdown caches under /api/seo/sites/.../search-console/...
+        // with staleTime Infinity; disconnecting Google must drop it too, not only this tool's own keys.
+        predicate: (q) => String(q.queryKey[0]).startsWith(base) || String(q.queryKey[0]).includes("/search-console/"),
       });
       if (notifySuccess) toast({
         title,
