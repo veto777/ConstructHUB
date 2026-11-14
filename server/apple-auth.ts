@@ -166,7 +166,14 @@ async function accountFor(claims: Record<string, any>, input: z.infer<typeof bod
   let created = false;
   if (byEmail) {
     [user] = await db.select().from(users).where(eq(users.id, byEmail.id));
-    if (user && !user.emailVerified) await db.update(users).set({ emailVerified: true }).where(eq(users.id, user.id));
+    if (user && !user.emailVerified) {
+      // An unverified password account was never proven to belong to this email's owner (anyone can sign up with
+      // someone else's address). Apple has now proven who owns it, so the password a stranger may have set, and
+      // anything signed in with it, must not survive the link.
+      await db.update(users).set({ emailVerified: true, passwordHash: null, verificationToken: null, verificationExpiry: null, resetToken: null, resetExpiry: null }).where(eq(users.id, user.id));
+      await pool.query(`DELETE FROM session WHERE sess->'passport'->>'user'=$1 OR sess->>'pending2FAUserId'=$1`, [String(user.id)]);
+      user = { ...user, emailVerified: true, passwordHash: null };
+    }
   } else {
     const { generateAccountId } = await import("./auth");
     const displayName = [input.givenName, input.familyName].map((s) => s?.trim()).filter(Boolean).join(" ") || null;
@@ -202,6 +209,9 @@ export function registerAppleAuthRoutes(app: Express, opts: { keys?: AppleKeys }
         if (!req.user) return res.status(401).json({ message: "Not authenticated" });
         const { rows: [link] } = await pool.query("SELECT 1 FROM user_apple_ids WHERE sub=$1 AND user_id=$2", [claims.sub, req.user.id]);
         if (!link) return res.status(403).json({ message: "That Apple ID isn't the one linked to this account." });
+        // With two-step sign-in on, only the authenticator code re-verifies (as Google step-up and /api/auth/reauth do).
+        const { rows: [twoStep] } = await pool.query("SELECT totp_enabled FROM users WHERE id=$1", [req.user.id]);
+        if (!twoStep || twoStep.totp_enabled) return res.status(403).json({ message: "Use your authenticator code." });
         markRecentAuth(req, req.user.id);
         await logActivity(req, req.user.id, "security.reauthenticated", { method: "apple" });
         return res.json({ ok: true });

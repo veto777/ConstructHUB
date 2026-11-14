@@ -202,11 +202,18 @@ export async function setupAuth(app: Express) {
           const existingByEmail = await db.select().from(users).where(eq(users.email, email));
           if (existingByEmail.length > 0) {
             if (req.session) delete req.session.betaToken;
+            // An unverified password account was never proven to belong to this email's owner (anyone can
+            // sign up with someone else's address). Google has now proven who owns it, so the password a
+            // stranger may have set, and anything signed in with it, must not survive the link.
+            const unproven = !existingByEmail[0].emailVerified;
             await db
               .update(users)
-              .set({ googleId, displayName, avatarUrl, ...tokenData })
+              .set({ googleId, displayName, avatarUrl, ...tokenData, ...(unproven ? { passwordHash: null, verificationToken: null, verificationExpiry: null, resetToken: null, resetExpiry: null } : {}) })
               .where(eq(users.email, email));
-            return done(null, { ...existingByEmail[0], googleId, displayName, avatarUrl });
+            if (unproven) {
+              await pool.query(`DELETE FROM session WHERE sess->'passport'->>'user'=$1 OR sess->>'pending2FAUserId'=$1`, [String(existingByEmail[0].id)]);
+            }
+            return done(null, { ...existingByEmail[0], googleId, displayName, avatarUrl, ...(unproven ? { passwordHash: null } : {}) });
           }
 
           if (req.session) delete req.session.betaToken;
