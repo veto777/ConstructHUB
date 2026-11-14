@@ -35,7 +35,7 @@ export function effectiveVpnMode(settings: unknown): VpnMode {
 export const VPN_TRACK_BODY_LIMIT = "16kb";
 export const VPN_TRACK_ID_MAX = 64;
 const VPN_TRACK_FIELD_MAX = { fingerprint: 64, deviceType: 40, browser: 40, os: 40, referrer: 2000, landingPage: 2000, userAgent: 500 } as const;
-export type VpnTrackFields = { [K in keyof typeof VPN_TRACK_FIELD_MAX]: string | null };
+export type VpnTrackFields = { -readonly [K in keyof typeof VPN_TRACK_FIELD_MAX]: string | null };
 
 /** The optional text fields of a tracking body: a non-empty string cut to its cap, anything else null. */
 export function vpnTrackFields(body: unknown): VpnTrackFields {
