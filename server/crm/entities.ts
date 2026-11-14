@@ -5,6 +5,7 @@ import { invoiceRefundTotals } from "./refund-summary";
 import type { CrmCustomerDetailResponse } from "@shared/crm-customer-detail";
 import { objectPolicy, canShareWholeClientPortal } from "./object-access";
 import { csvCell } from "./csv";
+import { dedupePhoneDigits } from "./migrate-lib";
 /**
  * CRM entities — customers, projects, jobs, estimates, plus the org-wide
  * Documents Center lists (filtered estimates/invoices for /crm/estimates and
@@ -807,16 +808,21 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     // the caller which record already exists.
     const dupeOn = [
       parsed.data.email ? sql`lower(${crmCustomers.email}) = ${parsed.data.email.toLowerCase()}` : null,
-      parsed.data.phone ? sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${parsed.data.phone.replace(/\D/g, "")}` : null,
+      dedupePhoneDigits(parsed.data.phone) ? sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${dedupePhoneDigits(parsed.data.phone)}` : null,
     ].filter(Boolean) as any[];
     if (dupeOn.length && req.query.force !== "1") {
       const existing = await db.select().from(crmCustomers)
         .where(and(eq(crmCustomers.orgId, ctx.org.id), isNull(crmCustomers.archivedAt),
           or(...dupeOn) as any)).limit(3);
       if (existing.length) {
+        // Name only the matches this seat may open: a client in another
+        // division (or one a restricted seat is not on) stays unnamed.
+        const policy = objectPolicy(ctx);
+        const shown: typeof existing = [];
+        for (const c of existing) if (await policy.visible("customers", c.id)) shown.push(c);
         return res.status(409).json({
           message: "A client with that email or phone already exists.",
-          matches: existing.map((c) => ({
+          matches: shown.map((c) => ({
             id: c.id, displayName: c.displayName, email: c.email, phone: c.phone,
           })),
           hint: "Open the existing client, or POST again with ?force=1 to create anyway.",
