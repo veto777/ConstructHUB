@@ -642,7 +642,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay on this estimate." });
     const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
-      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+      .where(and(eq(crmPayments.estimateId, est.id), inArray(crmPayments.status, ["succeeded", "partially_refunded"]))).limit(1);
     if (settled.length) return res.status(409).json({ message: "This estimate has already been paid." });
     const invoiced = await liveInvoicesForEstimate(est);
     if (invoiced) {
@@ -974,9 +974,10 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay." });
 
-    // Double-pay guard: the deposit must not be collectable twice.
+    // Double-pay guard: the deposit must not be collectable twice (a deposit
+    // with a small refund on it, "partially_refunded", is still paid).
     const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
-      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+      .where(and(eq(crmPayments.estimateId, est.id), inArray(crmPayments.status, ["succeeded", "partially_refunded"]))).limit(1);
     if (settled.length) {
       return res.status(409).json({ message: "This estimate has already been paid." });
     }

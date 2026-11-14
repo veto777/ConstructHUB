@@ -25,7 +25,7 @@ import {
   crmNotificationChannel,
   crmClientTokens,
 } from "@shared/schema";
-import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
+import { and, eq, desc, asc, sql, isNull, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
@@ -628,9 +628,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }
 
     // Server-side paid flag — the client must never infer "paid" from the
-    // ?paid=1 redirect parameter alone.
+    // ?paid=1 redirect parameter alone. A deposit with a small refund on it
+    // ("partially_refunded") is still paid: the page must not offer it again.
     const settledPayments = await db.select({ id: crmPayments.id }).from(crmPayments)
-      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+      .where(and(eq(crmPayments.estimateId, est.id), inArray(crmPayments.status, ["succeeded", "partially_refunded"]))).limit(1);
 
     // The client must always see WHO their salesperson is and how to reach
     // them — the estimate writer first, the project's sales rep as fallback.
