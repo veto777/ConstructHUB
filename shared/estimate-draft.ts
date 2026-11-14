@@ -133,7 +133,7 @@ export function titleLooksAuto(title: string | null | undefined, items: Array<{ 
 
 export const pctTextToBps = (t: string): number => {
   const n = parseFloat(t || "0");
-  return Number.isFinite(n) ? Math.min(3000, Math.max(0, Math.round(n * 100))) : 0;
+  return Number.isFinite(n) ? Math.min(3000, Math.max(0, Math.round(n * 10000) / 100)) : 0;
 };
 
 /** The contractor discount as an estimate line (kind "discount", not taxable), or null when there is none. */
@@ -259,7 +259,7 @@ export function snapshotFromEstimate(
       : typeof e.titleAuto === "boolean" ? e.titleAuto
       : titleLooksAuto(e.title, rows),
     intro: e.introText ?? "",
-    taxPct: String(Number(((e.taxRateBps ?? 0) / 100).toFixed(2))),
+    taxPct: String(Number(((e.taxRateBps ?? 0) / 100).toFixed(4))),
     taxTouched: true,
     items: rows.map((i) => ({
       kind: i.kind ?? "labor", name: i.name === UNTITLED_LINE ? "" : i.name ?? "", description: i.description ?? "",

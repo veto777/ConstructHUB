@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { progressInvoiceItems } from "./invoice-math";
+import { progressInvoiceItems, invoiceLinesTotalCents, squareDrawToTotal } from "./invoice-math";
 const line = { kind: "labor", name: "Work", description: null, unit: "job", unitPriceCents: 100000, quantityMilli: 1000, taxable: true };
 describe("progress invoice cents", () => {
   it("preserves original quantity and unit price for a full draw", () => {
@@ -15,4 +15,12 @@ describe("progress invoice cents", () => {
     expect(rows[0].unitPriceCents).toBe(51);
     expect(rows[1]).toMatchObject({ kind: "discount", unitPriceCents: 6 });
   });
+});
+
+it("uses fractional basis points for invoices and exact draws", () => {
+  const lines = [{ ...line, unitPriceCents: 1_000_000 }];
+  expect(invoiceLinesTotalCents(lines, 662.5)).toBe(1066250);
+  expect(invoiceLinesTotalCents(lines, 663)).toBe(1066300);
+  squareDrawToTotal(lines, 662.5, 500000);
+  expect(invoiceLinesTotalCents(lines, 662.5)).toBe(500000);
 });

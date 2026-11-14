@@ -1,8 +1,15 @@
 import { sql } from "drizzle-orm";
 import { CRM_NOTIFICATION_CHANNEL_DEFAULTS } from "./notification-defaults";
-import { check, primaryKey, pgTable, text, varchar, integer, serial, bigserial, bigint, boolean, timestamp, jsonb, real, doublePrecision, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { customType, check, primaryKey, pgTable, text, varchar, integer, serial, bigserial, bigint, boolean, timestamp, jsonb, real, doublePrecision, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Decimal basis points preserve published rates while keeping number-valued CRM APIs.
+const taxRate = customType<{ data: number; driverData: string }>({
+  dataType: () => "numeric(8,2)",
+  fromDriver: (value) => Number(value),
+  toDriver: (value) => String(value),
+});
 
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -610,9 +617,9 @@ export const salesTaxRates = pgTable("sales_tax_rates", {
   zip: varchar("zip", { length: 5 }),
   // city | unincorporated | county | state | special
   kind: text("kind").notNull(),
-  // Combined state + local rate exactly as published (9.2 = 9.2%), and in estimate basis points (rounded).
+  // Combined state + local rate exactly as published (9.2 = 9.2%), and in decimal estimate basis points.
   ratePct: numeric("rate_pct", { precision: 7, scale: 4 }).notNull(),
-  rateBps: integer("rate_bps").notNull(),
+  rateBps: taxRate("rate_bps").notNull(),
   effectiveDate: date("effective_date").notNull(),
   source: text("source").notNull(),
   sourceUrl: text("source_url").notNull(),
@@ -1293,7 +1300,7 @@ export const crmOrgs = pgTable("crm_orgs", {
   defaultDepositBps: integer("default_deposit_bps").default(0),
   // Org-wide fallback sales-tax rate (basis points). City → division → org
   // resolution lives in server/crm/tax.ts; null means "no org default".
-  defaultTaxRateBps: integer("default_tax_rate_bps"),
+  defaultTaxRateBps: taxRate("default_tax_rate_bps"),
   currency: text("currency").default("usd"),
   // Set when the owner finishes (or dismisses) the setup checklist, so the
   // portal stops routing them back into onboarding.
@@ -2109,7 +2116,7 @@ export const crmEstimates = pgTable("crm_estimates", {
   // a client-supplied total.
   subtotalCents: integer("subtotal_cents").notNull().default(0),
   discountCents: integer("discount_cents").notNull().default(0),
-  taxRateBps: integer("tax_rate_bps").notNull().default(0),
+  taxRateBps: taxRate("tax_rate_bps").notNull().default(0),
   taxCents: integer("tax_cents").notNull().default(0),
   totalCents: integer("total_cents").notNull().default(0),
   depositCents: integer("deposit_cents"),
@@ -2367,7 +2374,7 @@ export const crmInvoices = pgTable("crm_invoices", {
   status: text("status").notNull().default("draft"),
   subtotalCents: integer("subtotal_cents").notNull().default(0),
   discountCents: integer("discount_cents").notNull().default(0),
-  taxRateBps: integer("tax_rate_bps").notNull().default(0),
+  taxRateBps: taxRate("tax_rate_bps").notNull().default(0),
   taxCents: integer("tax_cents").notNull().default(0),
   totalCents: integer("total_cents").notNull().default(0),
   paidCents: integer("paid_cents").notNull().default(0),

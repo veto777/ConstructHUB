@@ -93,12 +93,12 @@ const invalidateOrg = () => {
  * A percent box → basis points, or an error to show. Out-of-range input is
  * refused with a message, never silently clamped (150% must not save as 100%).
  */
-function pctToBps(raw: string, label: string, max: number, min = 0): { bps: number | null; error?: string } {
+function pctToBps(raw: string, label: string, max: number, min = 0, precision = 1): { bps: number | null; error?: string } {
   if (raw.trim() === "") return { bps: null };
   const n = Number(raw);
   if (!Number.isFinite(n)) return { bps: null, error: `${label} must be a number.` };
   if (n < min || n > max) return { bps: null, error: `${label} must be between ${min}% and ${max}%.` };
-  return { bps: Math.round(n * 100) };
+  return { bps: Math.round(n * 100 * precision) / precision };
 }
 
 export default function CrmSettingsPage() {
@@ -359,7 +359,7 @@ export default function CrmSettingsPage() {
       headlineTitle: bidHeadlineFromCustomFields(org.customFields)?.title ?? "",
       headlineSubline: bidHeadlineFromCustomFields(org.customFields)?.subline ?? "",
       depositPct: org.defaultDepositBps ? String(org.defaultDepositBps / 100) : "",
-      taxPct: org.defaultTaxRateBps ? String(org.defaultTaxRateBps / 100) : "",
+      taxPct: org.defaultTaxRateBps ? String(Number((org.defaultTaxRateBps / 100).toFixed(4))) : "",
     };
     const prev = defaultsSeed.current;
     defaultsSeed.current = { orgId: org.id, values: next };
@@ -372,7 +372,7 @@ export default function CrmSettingsPage() {
       // why) — a typo like 150% must never quietly save as 100%.
       const deposit = pctToBps(defaults.depositPct, "Default deposit", 100);
       if (deposit.error) throw new Error(deposit.error);
-      const tax = pctToBps(defaults.taxPct, "Default sales tax", 30);
+      const tax = pctToBps(defaults.taxPct, "Default sales tax", 30, 0, 100);
       if (tax.error) throw new Error(tax.error);
       return (await apiRequest("PATCH", "/api/crm/org", {
         estimateFooter: emptyToNull(defaults.estimateFooter),
@@ -975,7 +975,7 @@ export default function CrmSettingsPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="default-tax">Default sales tax (%)</Label>
-              <Input id="default-tax" type="number" min={0} max={30} step="0.1"
+              <Input id="default-tax" type="number" min={0} max={30} step="0.0001"
                 data-testid="input-default-tax" placeholder="e.g. 8.8"
                 value={defaults.taxPct}
                 onChange={(e) => setDefaults((d) => ({ ...d, taxPct: e.target.value }))} />

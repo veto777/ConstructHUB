@@ -1580,7 +1580,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       title: z.string().max(200).default("Estimate"),
       introText: z.string().max(8000).nullable().optional(),
       termsText: z.string().max(20000).nullable().optional(),
-      taxRateBps: z.number().int().min(0).max(3000).default(0),
+      taxRateBps: z.number().multipleOf(0.01).min(0).max(3000).default(0),
       depositCents: z.number().int().min(0).nullable().optional(),
       items: z.array(itemSchema).max(300).default([]),
       // The New estimate dialog's autosave: a DRAFT created as soon as the form has content (never sent).
@@ -1746,7 +1746,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       title: z.string().min(1).max(200).optional(),
       introText: z.string().max(8000).nullable().optional(),
       termsText: z.string().max(20000).nullable().optional(),
-      taxRateBps: z.number().int().min(0).max(3000).optional(),
+      taxRateBps: z.number().multipleOf(0.01).min(0).max(3000).optional(),
       depositCents: z.number().int().min(0).nullable().optional(),
       // This document's own copy of the Settings defaults.
       footerText: z.string().max(5000).nullable().optional(),

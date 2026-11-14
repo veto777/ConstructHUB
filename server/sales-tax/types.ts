@@ -63,8 +63,8 @@ export type SalesTaxSource = {
   load(ctx: FetchCtx): Promise<SalesTaxSourceResult[]>;
 };
 
-/** Percent → basis points as the estimate stores them (integer; 8.875% → 888). */
-export const pctToBps = (pct: number): number => Math.round(pct * 100);
+/** Percent → basis points as the estimate stores them (two decimals; 8.875% → 887.5). */
+export const pctToBps = (pct: number): number => Math.round(pct * 10000) / 100;
 
 /**
  * A published table whose effective date (YYYY-MM-DD) is still ahead of today. States post next quarter's files

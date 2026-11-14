@@ -79,7 +79,9 @@ describe("helpers", () => {
     expect(toPct(".0920", true)).toBe(9.2);
     expect(toPct("8.875%", false)).toBe(8.875);
     expect(pctToBps(9.2)).toBe(920);
-    expect(pctToBps(8.875)).toBe(888);
+    expect(pctToBps(8.875)).toBe(887.5);
+    expect(pctToBps(6.625)).toBe(662.5);
+    expect(pctToBps(6.1875)).toBe(618.75);
     expect(quarterLabel("2026-10-01")).toBe("Q4 2026");
     expect(titleCase("SEDRO-WOOLLEY")).toBe("Sedro-Woolley");
   });
@@ -190,4 +192,11 @@ describe("notYetInForce", () => {
     expect(notYetInForce("2027-01-01", new Date("2027-01-01T00:00:00Z"))).toBe(false);
     expect(notYetInForce("2026-10-01", new Date("2026-12-05T08:00:00Z"))).toBe(false);
   });
+});
+
+it("represents every bundled published rate to all four percent decimals", () => {
+  const bundle: BundledSalesTaxFile = JSON.parse(readFileSync(join(import.meta.dirname, "..", "data", "sales-tax-rates.json"), "utf8"));
+  for (const state of bundle.states) for (const row of state.rows) {
+    expect((pctToBps(row[5]) / 100).toFixed(4)).toBe(row[5].toFixed(4));
+  }
 });

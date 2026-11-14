@@ -7,6 +7,7 @@ import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 
 vi.mock("../email", () => ({ sendWithFallback: vi.fn(async () => ({ accepted: ["fixture@example.invalid"] })) }));
@@ -54,7 +55,7 @@ describe.skipIf(!lane)("estimate tax from the job-site address (lane Postgres)",
     ({ pool } = await import("../db"));
     await (await import("./schema-ensure")).ensureCrmSchema();
     await (await import("../sales-tax/store")).seedSalesTaxRates(pool, join(import.meta.dirname, "..", "data"));
-    for (const r of (await pool.query("SELECT city, rate_bps FROM sales_tax_rates WHERE state='WA' AND city IN ('Bellingham','Ferndale')")).rows) waRate[r.city] = r.rate_bps;
+    for (const r of (await pool.query("SELECT city, rate_bps FROM sales_tax_rates WHERE state='WA' AND city IN ('Bellingham','Ferndale')")).rows) waRate[r.city] = Number(r.rate_bps);
     userId = (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [`i-tax-${randomUUID()}@example.invalid`])).rows[0].id;
     otherUserId = (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [`i-tax2-${randomUUID()}@example.invalid`])).rows[0].id;
     await pool.query("INSERT INTO crm_subscriptions(user_id,plan,status) VALUES($1,'crm_essentials','active'),($2,'crm_essentials','active')", [userId, otherUserId]);
@@ -83,6 +84,71 @@ describe.skipIf(!lane)("estimate tax from the job-site address (lane Postgres)",
     }
     await pool.query("DELETE FROM crm_subscriptions WHERE user_id = ANY($1::int[])", [[userId, otherUserId]]);
     await pool.query("DELETE FROM users WHERE id = ANY($1::int[])", [[userId, otherUserId]]);
+  });
+
+  it("widens legacy integer columns without changing saved money, and repairs the reference cache once", async () => {
+    const c = await pool.connect();
+    try {
+      await c.query("BEGIN");
+      const schema = `tax_precision_${randomUUID().replaceAll("-", "")}`;
+      await c.query(`CREATE SCHEMA ${schema}`);
+      await c.query(`SET LOCAL search_path TO ${schema}`);
+      await c.query(`CREATE TABLE crm_estimates (tax_rate_bps integer, tax_cents integer, total_cents integer);
+        CREATE TABLE crm_invoices (tax_rate_bps integer, tax_cents integer, total_cents integer);
+        CREATE TABLE crm_orgs (default_tax_rate_bps integer);
+        INSERT INTO crm_estimates VALUES (663, 66300, 1066300);
+        INSERT INTO crm_invoices VALUES (663, 66300, 1066300);
+        INSERT INTO crm_orgs VALUES (663)`);
+      // Execute the actual guarded migration from ensure-schema, isolated from other scratch fixtures.
+      const source = readFileSync(join(import.meta.dirname, "schema-ensure.ts"), "utf8");
+      const migration = source.slice(source.indexOf("-- Widen only")).match(/DO \$\$ BEGIN[\s\S]*?END \$\$;/)![0];
+      await c.query(migration);
+      await c.query(migration);
+      for (const table of ["crm_estimates", "crm_invoices"]) {
+        expect((await c.query(`SELECT * FROM ${table}`)).rows[0]).toEqual({ tax_rate_bps: "663.00", tax_cents: 66300, total_cents: 1066300 });
+        await c.query(`INSERT INTO ${table} VALUES (662.5, 66250, 1066250)`);
+      }
+      expect((await c.query("SELECT default_tax_rate_bps FROM crm_orgs")).rows[0].default_tax_rate_bps).toBe("663.00");
+      const { SALES_TAX_DDL, ensureSalesTaxSchema } = await import("../sales-tax/schema");
+      await c.query(SALES_TAX_DDL[0]);
+      await c.query(`INSERT INTO sales_tax_rates (state, kind, rate_pct, rate_bps, effective_date, source, source_url, period_label)
+        VALUES ('NJ', 'state', 6.625, 663, '2026-10-01', 'Fixture', '', 'Q4 2026')`);
+      await ensureSalesTaxSchema(c);
+      await ensureSalesTaxSchema(c);
+      expect((await c.query("SELECT rate_bps FROM sales_tax_rates")).rows[0].rate_bps).toBe("662.50");
+    } finally {
+      await c.query("ROLLBACK");
+      c.release();
+    }
+  });
+
+  it("charges NJ exactly through estimate creation, editing, and invoice creation", async () => {
+    const customerId = await client({ addressLine1: "1 Market St", city: "Newark", state: "NJ", postalCode: "07102" });
+    const resolved = await rate(customerId);
+    expect(resolved.data.bps).toBe(662.5);
+    expect(resolved.data.label).toContain("6.625%");
+    expect(resolved.data.label).not.toContain("rounded from");
+    const items = [{ name: "Taxable work", unitPriceCents: 1_000_000, quantityMilli: 1000, taxable: true }];
+    const created = await call("/api/crm/estimates", { customerId, items });
+    expect(created.status).toBe(201);
+    expect(created.data).toMatchObject({ taxRateBps: 662.5, taxCents: 66250, totalCents: 1066250 });
+    const edited = await call(`/api/crm/estimates/${created.data.id}`, { taxRateBps: 618.75 }, "PATCH");
+    expect(edited.status).toBe(200);
+    expect(edited.data).toMatchObject({ taxRateBps: 618.75, taxCents: 61875 });
+    const invoice = await call("/api/crm/invoices", { customerId, taxRateBps: 662.5, items });
+    expect(invoice.status).toBe(201);
+    expect(invoice.data).toMatchObject({ taxRateBps: 662.5, taxCents: 66250, totalCents: 1066250 });
+  });
+
+  it("preserves a saved integer rate and totals across schema ensure and an unrelated edit", async () => {
+    const customerId = await client({ addressLine1: "1 Market St", city: "Newark", state: "NJ", postalCode: "07102" });
+    const saved = await call("/api/crm/estimates", { customerId, taxRateBps: 663,
+      items: [{ name: "Existing work", unitPriceCents: 1_000_000, quantityMilli: 1000, taxable: true }] });
+    expect(saved.status).toBe(201);
+    expect(saved.data).toMatchObject({ taxRateBps: 663, taxCents: 66300, totalCents: 1066300 });
+    await (await import("./schema-ensure")).ensureCrmSchema();
+    const edited = await call(`/api/crm/estimates/${saved.data.id}`, { title: "Updated title" }, "PATCH");
+    expect(edited.data).toMatchObject({ taxRateBps: 663, taxCents: 66300, totalCents: 1066300 });
   });
 
   it("the bundled WA DOR table is loaded (Bellingham, Ferndale)", () => {
@@ -175,7 +241,7 @@ describe.skipIf(!lane)("estimate tax from the job-site address (lane Postgres)",
     const e = await call("/api/crm/estimates", { customerId: id, title: "Hook", items: [{ name: "Work", unitPriceCents: 10000 }] });
     expect(e.status).toBe(201);
     const ts = await taxSourceOf(e.data.id);
-    expect(ts.tax_rate_bps).toBe(waRate.Bellingham);
+    expect(Number(ts.tax_rate_bps)).toBe(waRate.Bellingham);
     expect(ts.t).toMatchObject({ source: "official", city: "Bellingham", state: "WA", official: { source: "WA DOR" }, treatment: { treatment: "taxable" } });
   });
 
@@ -185,7 +251,7 @@ describe.skipIf(!lane)("estimate tax from the job-site address (lane Postgres)",
     expect((await taxSourceOf(same.data.id)).t).toMatchObject({ source: "official", bps: waRate.Bellingham });
     const manual = await call("/api/crm/estimates", { customerId: id, title: "Manual", taxRateBps: 0, items: [{ name: "W", unitPriceCents: 100 }] });
     const ts = await taxSourceOf(manual.data.id);
-    expect(ts.tax_rate_bps).toBe(0);
+    expect(Number(ts.tax_rate_bps)).toBe(0);
     expect(ts.t).toMatchObject({ source: "manual", bps: 0, suggested: { source: "official", bps: waRate.Bellingham } });
   });
 });

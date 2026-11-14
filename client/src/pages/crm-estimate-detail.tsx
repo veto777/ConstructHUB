@@ -150,7 +150,7 @@ export default function CrmEstimateDetailPage() {
     if (!e) return;
     setTitle(e.title ?? "");
     setIntro(e.introText ?? "");
-    setTaxPct(((e.taxRateBps ?? 0) / 100).toString());
+    setTaxPct(String(Number(((e.taxRateBps ?? 0) / 100).toFixed(4))));
     setDeposit(e.depositCents != null ? (e.depositCents / 100).toString() : "");
     setDivisionId(e.divisionId ?? "");
     setStatus(e.status ?? "draft");
@@ -179,7 +179,7 @@ export default function CrmEstimateDetailPage() {
       subtotal += c;
       if (l.taxable) taxable += c;
     }
-    const tax = Math.round((Math.max(0, taxable - discount) * Math.round((parseFloat(taxPct) || 0) * 100)) / 10000);
+    const tax = Math.round((Math.max(0, taxable - discount) * (Math.round((parseFloat(taxPct) || 0) * 10000) / 100)) / 10000);
     return { subtotal, discount, tax, total: Math.max(0, subtotal - discount + tax) };
   }, [lines, taxPct]);
 
@@ -225,7 +225,7 @@ export default function CrmEstimateDetailPage() {
       return (await apiRequest("PATCH", `/api/crm/estimates/${id}`, {
         title: title.trim() || "Estimate",
         introText: intro.trim() || null,
-        taxRateBps: Math.round((parseFloat(taxPct) || 0) * 100),
+        taxRateBps: (Math.round((parseFloat(taxPct) || 0) * 10000) / 100),
         depositCents,
         divisionId: divisionId || null,
         // Only a status the person actually changed. An untouched select can
@@ -484,7 +484,7 @@ export default function CrmEstimateDetailPage() {
                       <div><span className="text-muted-foreground">Estimate:</span> <span className="font-medium">{e.number} · {e.title}</span></div>
                       <div><span className="text-muted-foreground">Total:</span> <span className="font-medium">{money(e.totalCents)}</span>
                         {e.depositCents ? <> · <span className="text-muted-foreground">deposit</span> <span className="font-medium">{money(e.depositCents)}</span></> : null}
-                        {" "}· <span className="text-muted-foreground">tax</span> <span className="font-medium">{((e.taxRateBps ?? 0) / 100).toString()}%</span></div>
+                        {" "}· <span className="text-muted-foreground">tax</span> <span className="font-medium">{String(Number(((e.taxRateBps ?? 0) / 100).toFixed(4)))}%</span></div>
                       <div className="text-muted-foreground">The client gets an email with a link to view and approve it.</div>
                     </div>
                   ),
@@ -584,7 +584,7 @@ export default function CrmEstimateDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Tax %</Label>
-                  <Input type="number" step="0.01" min={0} max={TAX_MAX_PCT} value={taxPct}
+                  <Input type="number" step="0.0001" min={0} max={TAX_MAX_PCT} value={taxPct}
                     onChange={(ev) => setTaxPct(ev.target.value)}
                     aria-invalid={Number(taxPct) > TAX_MAX_PCT || Number(taxPct) < 0}
                     data-testid="input-edit-tax" />
