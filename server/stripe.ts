@@ -914,6 +914,12 @@ export function registerStripeRoutes(app: Express) {
           const r = await applySeoCreditEvent(event, stripe as unknown as ReversalStripe);
           eventUserId = r.userId;
           sendBillingEmail = false;
+          // The referral program (server/referrals): a refund or chargeback before payout voids the referral.
+          // (This used to sit in a second `case "charge.refunded"` block further down, which could never run.)
+          if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
+            const { onChargeReversed } = await import("./referrals/service");
+            await onChargeReversed(event);
+          }
           break;
         }
         case "invoice.paid":
@@ -926,14 +932,6 @@ export function registerStripeRoutes(app: Express) {
           sendBillingEmail = synced?.applied === true;
           // At most two automatic card attempts per bill (server/billing/retry-cap.ts).
           if (event.type === "invoice.payment_failed") await capInvoiceRetries(event.data.object as Stripe.Invoice);
-          break;
-        }
-        case "charge.refunded":
-        case "charge.dispute.created": {
-          // The referral program (server/referrals): a refund or chargeback before payout voids the referral.
-          sendBillingEmail = false;
-          const { onChargeReversed } = await import("./referrals/service");
-          await onChargeReversed(event);
           break;
         }
         case "customer.subscription.trial_will_end": {
