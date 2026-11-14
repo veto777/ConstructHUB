@@ -23,6 +23,32 @@ export const mailboxConfig = (env: NodeJS.ProcessEnv = process.env) => ({
   pass: (env.PRESS_APP_PASSWORD ?? "").replace(/\s+/g, ""),
   wireTo: env.PRESS_WIRE_EMAIL?.trim() || "",
 });
+/** Mail providers anyone can open an address at: a shared domain there says nothing about who is writing. */
+const SHARED_MAIL_DOMAINS = new Set(["gmail.com", "googlemail.com", "yahoo.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "aol.com", "icloud.com", "me.com", "proton.me", "protonmail.com", "gmx.com", "mail.com", "zoho.com", "yandex.com"]);
+/**
+ * Is this inbound email from the wire? Only then may the worker act on it by itself (mark a release live, ask for
+ * changes, store a report); anything else waits for the owner. The wire is PRESS_WIRE_EMAIL, any address at its
+ * domain (unless that is a shared mail provider), and whatever PRESS_WIRE_FROM adds (comma-separated addresses or
+ * "@domain" entries, for a wire that answers from another system).
+ */
+export function isWireSender(fromEmail: string | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
+  const from = (fromEmail ?? "").trim().toLowerCase();
+  const at = from.lastIndexOf("@");
+  if (at < 1 || at === from.length - 1) return false;
+  const domain = from.slice(at + 1);
+  const wire = mailboxConfig(env).wireTo.toLowerCase();
+  if (wire) {
+    if (from === wire) return true;
+    const wireDomain = wire.slice(wire.lastIndexOf("@") + 1);
+    if (wireDomain && domain === wireDomain && !SHARED_MAIL_DOMAINS.has(wireDomain)) return true;
+  }
+  for (const raw of (env.PRESS_WIRE_FROM ?? "").split(",")) {
+    const e = raw.trim().toLowerCase();
+    if (!e) continue;
+    if (e.startsWith("@") ? domain === e.slice(1) : from === e) return true;
+  }
+  return false;
+}
 export const mailboxConfigured = (env: NodeJS.ProcessEnv = process.env) => { const c = mailboxConfig(env); return Boolean(c.user && c.pass); };
 export const wireConfigured = (env: NodeJS.ProcessEnv = process.env) => Boolean(mailboxConfig(env).wireTo);
 /** The address customers see as the sender (the real mailbox when configured, else the documented one). */

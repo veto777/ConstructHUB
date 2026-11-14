@@ -10,6 +10,8 @@ import * as store from "./store";
 import { datelineFor, draftRelease, reviseRelease } from "./writer";
 
 const text = (max: number) => z.string().trim().max(max);
+/** A photo the upload route stored (routes.ts POST .../photos): press/photos/<uuid>.<ext>. */
+export const PRESS_PHOTO_KEY = /^press\/photos\/[A-Za-z0-9-]+\.(jpg|png|webp)$/;
 /** What the customer fills in (shared/press.ts PressReleaseInput). */
 export const pressInputSchema = z.object({
   newsType: z.enum(PRESS_NEWS_TYPES.map((t) => t.key) as [string, ...string[]]),
@@ -25,7 +27,10 @@ export const pressInputSchema = z.object({
   spokespersonTitle: text(120),
   quoteNotes: text(2000),
   about: text(3000),
-  photos: z.array(z.object({ key: text(300), url: text(500), caption: text(200) })).max(6).default([]),
+  // Only photos the upload route stored: the key is read from storage and emailed to the wire, so a key the
+  // customer typed (another file, another account's) is refused.
+  photos: z.array(z.object({ key: text(300), url: text(500), caption: text(200) })
+    .refine((p) => PRESS_PHOTO_KEY.test(p.key) && p.url === `/api/files/${p.key}`, "Add photos with the upload button")).max(6).default([]),
 }).strict();
 
 /** Swappable in tests (the writer calls an AI provider). */

@@ -126,11 +126,29 @@ export async function spendCreditWith(client: PoolClient, releaseId: number, use
 }
 /** A cancelled release gives its credit back to the order it took it from. */
 export async function refundCredit(releaseId: number): Promise<void> {
+  // One statement: the release row is locked, so two refunds of one release can never both find its order.
   await pool.query(
-    `UPDATE press_orders o SET credits_used = GREATEST(0, o.credits_used - 1) FROM press_releases r WHERE r.id=$1 AND r.order_id=o.id`,
+    `WITH old AS (SELECT id, order_id FROM press_releases WHERE id=$1 AND order_id IS NOT NULL FOR UPDATE),
+          rel AS (UPDATE press_releases r SET order_id=NULL, updated_at=now() FROM old WHERE r.id=old.id)
+     UPDATE press_orders o SET credits_used = GREATEST(0, o.credits_used - 1) FROM old WHERE o.id=old.order_id`,
     [releaseId],
   );
-  await pool.query(`UPDATE press_releases SET order_id=NULL, updated_at=now() WHERE id=$1`, [releaseId]);
+}
+/** The statuses a customer may still cancel from (nothing has reached the wire, or the wire sent it back). */
+export const CANCELLABLE = ["draft", "ready", "changes_requested"] as const;
+/**
+ * Cancel a release and give its credit back, in one statement on the locked row: parallel cancels refund once, and
+ * a release the worker has already claimed for the wire ('queued' or later) is not cancelled at all. Null when the
+ * release had moved on (the caller answers 409).
+ */
+export async function cancelRelease(releaseId: number): Promise<ReleaseRow | null> {
+  const { rows } = await pool.query<ReleaseRow>(
+    `WITH old AS (SELECT id, order_id FROM press_releases WHERE id=$1 AND status IN ('draft','ready','changes_requested') FOR UPDATE),
+          ref AS (UPDATE press_orders o SET credits_used = GREATEST(0, o.credits_used - 1) FROM old WHERE o.id=old.order_id)
+     UPDATE press_releases r SET status='cancelled', order_id=NULL, send_at=NULL, send_for_me=false, updated_at=now() FROM old WHERE r.id=old.id RETURNING r.*`,
+    [releaseId],
+  );
+  return rows[0] ?? null;
 }
 
 // ---- releases -----------------------------------------------------------------------------------------------
