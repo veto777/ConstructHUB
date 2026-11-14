@@ -75,6 +75,10 @@ type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
 
 const emptyToNull = (s: string) => (s.trim() === "" ? null : s.trim());
 
+/** True when a form still holds exactly the values it was filled with. */
+const sameFields = (form: Record<string, string>, seed: Record<string, string>) =>
+  Object.keys(seed).every((k) => form[k] === seed[k]);
+
 /**
  * Every org write refreshes BOTH caches: /api/crm/org (this page) and
  * /api/crm/me, whose `org` snapshot seeds Team & Company and the app shell. A
@@ -149,10 +153,15 @@ export default function CrmSettingsPage() {
   // The logo URL whose preview failed to load — the warning shows only while
   // the field still holds that exact URL.
   const [logoBrokenUrl, setLogoBrokenUrl] = useState<string | null>(null);
+  // What the form was last filled from. The org copy can arrive stale from the
+  // cache and be refreshed a moment later (another page changed it), so the
+  // form refills when the server copy changes, but only while nobody has
+  // typed in it: unsaved edits are never overwritten.
+  const companySeed = useRef<{ orgId: string; values: Record<string, string> } | null>(null);
   useEffect(() => {
     if (!org) return;
     const s = (v: any) => v ?? "";
-    setCompany({
+    const next: Record<string, string> = {
       name: s(org.name), legalEntityName: s(org.legalEntityName),
       email: s(org.email), phone: s(org.phone), website: s(org.website),
       logoUrl: s(org.logoUrl),
@@ -160,8 +169,11 @@ export default function CrmSettingsPage() {
       city: s(org.city), state: s(org.state), postalCode: s(org.postalCode),
       licenseNumber: s(org.licenseNumber), licenseState: s(org.licenseState),
       industry: s(org.industry), description: s(org.description),
-    });
-  }, [org?.id]);
+    };
+    const prev = companySeed.current;
+    companySeed.current = { orgId: org.id, values: next };
+    setCompany((cur) => (!prev || prev.orgId !== org.id || sameFields(cur, prev.values) ? next : cur));
+  }, [org?.id, org?.updatedAt]);
 
   const setC = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setCompany((c) => ({ ...c, [k]: e.target.value }));
@@ -345,9 +357,12 @@ export default function CrmSettingsPage() {
     warrantyText: "", depositPct: "", taxPct: "",
     headlineTitle: "", headlineSubline: "",
   });
+  // Same rule as the company form: refill from a fresher server copy only
+  // while the form is untouched.
+  const defaultsSeed = useRef<{ orgId: string; values: Record<string, string> } | null>(null);
   useEffect(() => {
     if (!org) return;
-    setDefaults({
+    const next = {
       estimateFooter: org.estimateFooter ?? "",
       invoiceFooter: org.invoiceFooter ?? "",
       termsAndConditions: org.termsAndConditions ?? "",
@@ -356,8 +371,11 @@ export default function CrmSettingsPage() {
       headlineSubline: bidHeadlineFromCustomFields(org.customFields)?.subline ?? "",
       depositPct: org.defaultDepositBps ? String(org.defaultDepositBps / 100) : "",
       taxPct: org.defaultTaxRateBps ? String(org.defaultTaxRateBps / 100) : "",
-    });
-  }, [org?.id]);
+    };
+    const prev = defaultsSeed.current;
+    defaultsSeed.current = { orgId: org.id, values: next };
+    setDefaults((cur) => (!prev || prev.orgId !== org.id || sameFields(cur, prev.values) ? next : cur));
+  }, [org?.id, org?.updatedAt]);
 
   const saveDefaults = useMutation({
     mutationFn: async () => {
