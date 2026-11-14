@@ -259,7 +259,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.use(["/api/auth/signup", "/api/auth/signup-lead", "/api/auth/finish-setup", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/2fa/login"],
+  app.use(["/api/auth/signup", "/api/auth/signup-lead", "/api/auth/finish-setup", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/resend-verification", "/api/auth/2fa/login"],
     rateLimit("growth-auth", 30, 60, 15 * 60_000, { admins: "limited" }), async (req, res, next) => {
       if (typeof req.body?.email === "string") {
         const account = createHash("sha256").update(req.body.email.trim().toLowerCase()).digest("hex");
@@ -916,7 +916,8 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ message: "Current password is incorrect" });
       }
       const hash = await bcrypt.hash(newPassword, 10);
-      await db.update(users).set({ passwordHash: hash }).where(eq(users.id, req.user.id));
+      // A reset link requested before this change must not outlive it.
+      await db.update(users).set({ passwordHash: hash, resetToken: null, resetExpiry: null }).where(eq(users.id, req.user.id));
       await revokeDevices(user.id);
       await securityChanged(req, user.id, "security.password_changed", "Your password was changed");
       // Owner's "account changed" notice — field names only, never the password.

@@ -328,12 +328,9 @@ export function registerStripeRoutes(app: Express) {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
-      // Beta accounts get the CRM free for the duration of the beta — never
-      // send one to a card form.
-      const { isBetaUser } = await import("./crm/beta");
-      if (await isBetaUser(user.id)) {
-        return res.status(400).json({ message: "Your account is included in the beta — no payment needed." });
-      }
+      // A beta account (users.beta_at) has the CRM free, not a platform plan (server/crm/entitlements.ts; the
+      // platform entitlements never read beta_at), so it buys a platform plan here like anyone else. The CRM
+      // checkout refuses beta accounts on its own (server/crm/billing.ts).
 
       const order = parsePlanOrder(req.body ?? {});
       await billingSchemaReady();
