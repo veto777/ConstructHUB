@@ -11,7 +11,7 @@ export async function flaggedIpsForZone(
   const sql = `SELECT b.ip_address,b.reason,'Click Guard' source FROM blocked_ips b JOIN tracked_domains d ON d.id=b.domain_id
     WHERE d.user_id=$1 AND b.is_active AND lower(regexp_replace(split_part(regexp_replace(d.domain,'^https?://','','i'),'/',1),'^www\\.','','i'))=$2
     UNION ALL SELECT v.ip_address,v.detection_method reason,'VPN Shield' source FROM vpn_visits v JOIN tracked_domains d ON d.id=v.domain_id
-    WHERE d.user_id=$1 AND v.action='blocked' AND lower(regexp_replace(split_part(regexp_replace(d.domain,'^https?://','','i'),'/',1),'^www\\.','','i'))=$2`;
+    WHERE d.user_id=$1 AND v.action IN ('block','blocked') AND lower(regexp_replace(split_part(regexp_replace(d.domain,'^https?://','','i'),'/',1),'^www\\.','','i'))=$2`;
   const args = [user, a.domain, `%${p.q}%`];
   const { rows } = await pool.query(
     `SELECT DISTINCT * FROM (${sql}) f WHERE ip_address ILIKE $3 ORDER BY ip_address,source,reason LIMIT $4 OFFSET $5`,
