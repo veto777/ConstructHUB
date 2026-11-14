@@ -1693,7 +1693,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }));
 
     res.json({
-      customer: { displayName: cust.displayName, email: cust.email, phone: cust.phone },
+      // Name only: this link needs no sign-in, and the page shows nothing else of the client.
+      customer: { displayName: cust.displayName },
       company: {
         name: org.name, phone: org.phone, email: org.email,
         website: org.website, logoUrl: org.logoUrl,
