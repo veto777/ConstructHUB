@@ -262,6 +262,9 @@ export default function CrmEstimateDetailPage() {
     mutationFn: async () => (await apiRequest("POST", `/api/crm/estimates/${id}/send`, {})).json(),
     onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${id}`] });
+      // The lists and the client page show this estimate's status too.
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
+      if (e?.customerId) queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${e.customerId}`] });
       if (r.emailed) {
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}.` });
       } else {

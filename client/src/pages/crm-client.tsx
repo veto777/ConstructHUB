@@ -1330,6 +1330,8 @@ export default function CrmClientPage() {
       autosave.reset();
       resetForm();
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+      // The estimate's own page and the Estimates list cache it too.
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
       toast({ title: wasEditing ? "Estimate saved" : "Estimate created" });
     },
     onError: (e: any) => toast({ title: "Could not create estimate", description: apiErrorMessage(e), variant: "destructive" }),
@@ -1348,6 +1350,7 @@ export default function CrmClientPage() {
       (await apiRequest("POST", `/api/crm/estimates/${estimateId}/send`, { sms: alsoText })).json(),
     onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
       if (r.emailed) {
         const textPart = r.texted ? " and texted" : r.smsError ? ` (text failed: ${r.smsError})` : "";
         toast({ title: "Estimate sent", description: `Emailed to ${r.estimate?.sentToEmail ?? "the client"}${textPart}.` });
