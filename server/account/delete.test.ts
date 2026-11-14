@@ -9,7 +9,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { ensureAccountSchema } from "./schema";
-import { closeAccount, deletionBlockers, ensureAccountDeletionSchema, fromNativeApp } from "./delete";
+import { billableSubscriptionIds, closeAccount, deletionBlockers, ensureAccountDeletionSchema, fromNativeApp } from "./delete";
+import { crmBillingSchemaReady } from "../crm/entitlements";
+import { callAssistantSchemaReady } from "../voice/subscription-store";
+import { alacarteSchemaReady } from "../billing/alacarte-store";
 
 const users: number[] = [];
 const orgs: string[] = [];
@@ -26,11 +29,17 @@ beforeAll(async () => {
   await ensureAppAuthSchema();
   await ensureAppConnectionsSchema();
   await ensureAppPushSchema();
+  await crmBillingSchemaReady();
+  await callAssistantSchemaReady();
+  await alacarteSchemaReady();
 });
 afterAll(async () => {
   await pool.query("DELETE FROM crm_members WHERE org_id = ANY($1::text[])", [orgs]);
   await pool.query("DELETE FROM crm_orgs WHERE id = ANY($1::text[])", [orgs]);
   await pool.query("DELETE FROM subscriptions WHERE user_id = ANY($1::int[])", [users]);
+  for (const t of ["crm_subscriptions", "call_assistant_subscriptions", "alacarte_subscriptions"]) {
+    await pool.query(`DELETE FROM ${t} WHERE user_id = ANY($1::int[])`, [users]);
+  }
   await pool.query("DELETE FROM email_log WHERE user_id = ANY($1::int[])", [users]);
   await pool.query("DELETE FROM session WHERE sess->'passport'->>'user' = ANY($1::text[])", [users.map(String)]);
   await pool.query("DELETE FROM users WHERE id = ANY($1::int[])", [users]);
@@ -65,6 +74,22 @@ describe("closing an account (App Store 5.1.1(v))", () => {
     users.push(again.id);
     // Closing twice is refused.
     expect(await closeAccount(u.id)).toMatchObject({ ok: false, code: "already_closed" });
+  });
+
+  it("cancels the CRM plan, the Call Assistant and a la carte items too (audit H1: an account with no platform plan)", async () => {
+    const u = await user();
+    const tag = randomUUID().slice(0, 8);
+    await pool.query("INSERT INTO crm_subscriptions(user_id, plan, status, stripe_subscription_id) VALUES($1, 'basic', 'active', $2)", [u.id, `sub_crm_${tag}`]);
+    await pool.query("INSERT INTO call_assistant_subscriptions(user_id, tier, status, stripe_subscription_id) VALUES($1, 'starter', 'past_due', $2)", [u.id, `sub_ca_${tag}`]);
+    await pool.query("INSERT INTO alacarte_subscriptions(user_id, item_key, status, stripe_subscription_id) VALUES($1, 'jobcam', 'active', $2), ($1, 'ended_item', 'canceled', $3)",
+      [u.id, `sub_alc_${tag}`, `sub_old_${tag}`]);
+    expect((await billableSubscriptionIds(u.id)).sort()).toEqual([`sub_alc_${tag}`, `sub_ca_${tag}`, `sub_crm_${tag}`]);
+    const cancelled: string[] = [];
+    const r = await closeAccount(u.id, { cancelSubscription: async (id) => { cancelled.push(id); } });
+    expect(r).toMatchObject({ ok: true, cancelledSubscriptions: 3 });
+    expect(cancelled.sort()).toEqual([`sub_alc_${tag}`, `sub_ca_${tag}`, `sub_crm_${tag}`]);
+    expect((await pool.query("SELECT status FROM crm_subscriptions WHERE user_id = $1", [u.id])).rows[0].status).toBe("canceled");
+    expect((await pool.query("SELECT status FROM alacarte_subscriptions WHERE user_id = $1 AND item_key = 'jobcam'", [u.id])).rows[0].status).toBe("canceled");
   });
 
   it("a failed Stripe cancel changes nothing", async () => {

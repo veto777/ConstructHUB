@@ -328,12 +328,9 @@ export function registerStripeRoutes(app: Express) {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
 
-      // Beta accounts get the CRM free for the duration of the beta — never
-      // send one to a card form.
-      const { isBetaUser } = await import("./crm/beta");
-      if (await isBetaUser(user.id)) {
-        return res.status(400).json({ message: "Your account is included in the beta — no payment needed." });
-      }
+      // A beta account (users.beta_at) has the CRM free, not a platform plan (server/crm/entitlements.ts; the
+      // platform entitlements never read beta_at), so it buys a platform plan here like anyone else. The CRM
+      // checkout refuses beta accounts on its own (server/crm/billing.ts).
 
       const order = parsePlanOrder(req.body ?? {});
       await billingSchemaReady();
@@ -914,6 +911,12 @@ export function registerStripeRoutes(app: Express) {
           const r = await applySeoCreditEvent(event, stripe as unknown as ReversalStripe);
           eventUserId = r.userId;
           sendBillingEmail = false;
+          // The referral program (server/referrals): a refund or chargeback before payout voids the referral.
+          // (This used to sit in a second `case "charge.refunded"` block further down, which could never run.)
+          if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
+            const { onChargeReversed } = await import("./referrals/service");
+            await onChargeReversed(event);
+          }
           break;
         }
         case "invoice.paid":
@@ -926,14 +929,6 @@ export function registerStripeRoutes(app: Express) {
           sendBillingEmail = synced?.applied === true;
           // At most two automatic card attempts per bill (server/billing/retry-cap.ts).
           if (event.type === "invoice.payment_failed") await capInvoiceRetries(event.data.object as Stripe.Invoice);
-          break;
-        }
-        case "charge.refunded":
-        case "charge.dispute.created": {
-          // The referral program (server/referrals): a refund or chargeback before payout voids the referral.
-          sendBillingEmail = false;
-          const { onChargeReversed } = await import("./referrals/service");
-          await onChargeReversed(event);
           break;
         }
         case "customer.subscription.trial_will_end": {
