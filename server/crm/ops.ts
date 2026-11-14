@@ -43,7 +43,7 @@ import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
 import { getBaseUrl } from "../auth";
 import { computeApprovalTotals } from "./discounts";
-import { progressInvoiceItems, squareDrawToTotal } from "./invoice-math";
+import { progressInvoiceItems, squareDrawToTotal, depositNetCents, dollarDrawShare } from "./invoice-math";
 import { lockDocNumbers, nextDocNumber } from "./doc-number";
 import { objectPolicy } from "./object-access";
 import { suggestPermitOffices } from "./permit-suggest";
@@ -326,7 +326,16 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       if (draw.data.amountCents > approval.totalCents) {
         return res.status(400).json({ message: `The signed total is ${usd(approval.totalCents)} — bill that or less.` });
       }
-      pct = Math.max(1, Math.min(10000, Math.round((draw.data.amountCents * 10000) / approval.totalCents)));
+      if (draw.data.amountIncludesTax) {
+        pct = Math.max(1, Math.min(10000, Math.round((draw.data.amountCents * 10000) / approval.totalCents)));
+      } else {
+        // Typed before tax: cap and share against the signed amount before tax (dollarDrawShare).
+        const share = dollarDrawShare(draw.data.amountCents, approval);
+        if ("over" in share) {
+          return res.status(400).json({ message: `The signed total is ${usd(share.preTaxCents)} before tax. Bill that or less.` });
+        }
+        pct = share.bps;
+      }
     }
     // "Final balance" bills exactly what is left — the signed total less every live invoice on the estimate, tax
     // included — so basis-point rounding on earlier draws never leaves cents behind (or bills them twice).
@@ -425,14 +434,19 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const tax = Math.round((Math.max(0, taxable - discount) * (est.taxRateBps || 0)) / 10000);
       const gross = Math.max(0, subtotal - discount + tax);
       const dueNow = gross - Math.round((gross * (retainageBps || 0)) / 10000);
-      const deposits = await tx.select().from(crmPayments).where(and(
+      // refunded_cents lives only in the database (payment-ledger-schema.ts), not on the Drizzle table, so it is
+      // read explicitly: a partly refunded deposit is credited at what is still held, never at its gross amount.
+      const deposits = await tx.select({
+        id: crmPayments.id, amountCents: crmPayments.amountCents, projectId: crmPayments.projectId,
+        refundedCents: sql<number>`coalesce(refunded_cents, 0)::int`,
+      }).from(crmPayments).where(and(
         eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.estimateId, est.id), isNull(crmPayments.invoiceId),
         inArray(crmPayments.status, ["succeeded", "partially_refunded"]),
       )).orderBy(asc(crmPayments.paidAt));
       let credited = 0;
       const creditedIds: string[] = [];
       for (const p of deposits) {
-        const net = Math.max(0, p.amountCents - Number((p as any).refundedCents ?? 0));
+        const net = depositNetCents(p);
         if (net <= 0 || credited + net > dueNow) continue;
         await tx.update(crmPayments).set({ invoiceId: row.id, projectId: p.projectId ?? row.projectId ?? null })
           .where(eq(crmPayments.id, p.id));
