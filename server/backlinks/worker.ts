@@ -73,7 +73,9 @@ export async function runQueuedDiscovery(n: number, capUsd = workerConfig().capU
   if (!isConfigured()) return { posted: 0, collected: 0, added: 0, costUsd: 0, stopped: "The search data source is not connected (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD)" };
   const out = { posted: 0, collected: 0, added: 0, costUsd: 0, stopped: null as string | null };
   for (const q of await store.postedQueries(COLLECT_PER_PASS)) {
-    const r = await collectSearch(q.taskId).catch((e: any) => ({ status: "failed" as const, message: String(e?.message ?? e) }));
+    // A thrown error is the data source being unreachable (timeout, 5xx, 429), not the search failing: the paid
+    // task is still there, so it stays posted and is collected on a later pass (a stale one is dropped below).
+    const r = await collectSearch(q.taskId).catch((e: any) => { console.warn(`[backlinks] search not collected yet ("${q.query}"): ${String(e?.message ?? e)}`); return { status: "pending" as const }; });
     if (r.status === "pending") { if (q.stale) await store.dropTask(q.id); continue; }
     if (r.status === "failed") { console.warn(`[backlinks] search skipped ("${q.query}"): ${r.message}`); await store.recordQueryRun(q.id, 0, 0, 0); continue; }
     const added = await store.addCandidates(r.hits, q.kind, q.query, q.niche === "general" ? null : q.niche);
