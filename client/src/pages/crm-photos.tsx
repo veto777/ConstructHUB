@@ -72,7 +72,12 @@ export default function CrmPhotosPage() {
     return set.size === 1 ? [...set][0]! : null;
   }, [selected]);
 
-  const shared = { jobStatus, q: job ? undefined : q || undefined, from: from || undefined, to: to || undefined };
+  // The date inputs mean the contractor's own day, so they go up as local-day instants (a bare date is read as UTC).
+  const localDay = (d: string, end: boolean) => {
+    const t = new Date(`${d}T${end ? "23:59:59.999" : "00:00:00"}`);
+    return Number.isNaN(t.getTime()) ? undefined : t.toISOString();
+  };
+  const shared = { jobStatus, q: job ? undefined : q || undefined, from: from ? localDay(from, false) : undefined, to: to ? localDay(to, true) : undefined };
   const gridParams = { ...shared, stage, customerId: job?.customer.id };
   const showGrid = view === "all" || !!job;
 
