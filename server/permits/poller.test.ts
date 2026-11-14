@@ -37,6 +37,8 @@ beforeAll(async () => {
   permitAlertDeps.getAdapter = (platform) => platform === "FakePortal" ? fake : platform === "LegacyPortal" ? legacy : null;
   permitAlertDeps.browser = async () => { throw new Error("no browser in tests"); };
   permitAlertDeps.geocode = async () => null;
+  // The test account has no subscription; the plan check (audit 08 #5) is not what these cases exercise.
+  permitAlertDeps.entitled = async () => true;
   permitAlertDeps.deliver = async (watch, found) => { delivered.push({ watchId: watch.id, permits: found.map((p) => p.permitNumber) }); return { email: { ok: true } }; };
 });
 afterAll(async () => {
