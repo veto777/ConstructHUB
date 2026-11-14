@@ -133,6 +133,8 @@ function PayCard({ token, company, estimate, payInfo }: {
         body: JSON.stringify(method ? { method } : {}),
       });
       const j = await r.json().catch(() => ({}));
+      // Already invoiced: the server points at the invoice to pay (a same-site /i/ path only).
+      if (!r.ok && typeof j.invoiceUrl === "string" && j.invoiceUrl.startsWith("/i/")) return { url: j.invoiceUrl };
       if (!r.ok) throw new Error(j.message || "Could not start payment");
       return j;
     },
