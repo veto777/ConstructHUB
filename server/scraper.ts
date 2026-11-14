@@ -8,7 +8,7 @@ import { storage } from "./storage";
 function log(message: string, source = "scraper") {
   console.log(`${new Date().toLocaleTimeString("en-US")} [${source}] ${message}`);
 }
-import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
+import { liveSearchOutcome, scrapeFailureReason, createSlotQueue } from "./live-search-outcome";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./scrapers/types";
 import { USER_AGENT as ADAPTER_USER_AGENT } from "./scrapers/polite-fetch";
 import { guardResearchContext, researchNewContext, researchPost } from "./scrapers/research-transport";
@@ -188,6 +188,12 @@ export interface LiveSearchJob {
 
 const liveSearchJobs = new Map<string, LiveSearchJob>();
 
+// Portals being scraped at once across ALL live searches (each search runs up to four of its own). Two searches run
+// at full speed; more than that share these slots and take longer, rather than each opening four more contexts in the
+// single shared browser. A portal waiting for a slot stays "Waiting..." and its 75 s budget starts when it gets one.
+const LIVE_SEARCH_SERVER_SLOTS = 8;
+const liveSearchSlots = createSlotQueue(LIVE_SEARCH_SERVER_SLOTS);
+
 export function getLiveSearchJob(searchId: string): LiveSearchJob | undefined {
   return liveSearchJobs.get(searchId);
 }
@@ -270,25 +276,26 @@ export async function startLiveSearch(
       return;
     }
 
-    dbEntry.status = "running";
-    dbEntry.message = "Scraping...";
-    liveSearchJobs.set(searchId, { ...job });
-
     try {
       const url = db.searchUrl || db.portalUrl!;
       const jobId = dbEntry.jobId;
 
-      const scrapeResults = await withPortalBudget(scrapeByPlatform(
-        db.platform as ScraperPlatform,
-        url,
-        searchValue,
-        effectiveSearchType,
-        db.id,
-        db.name,
-        queryId,
-        jobId,
-        db.jurisdiction
-      ));
+      const scrapeResults = await liveSearchSlots.run(() => {
+        dbEntry.status = "running";
+        dbEntry.message = "Scraping...";
+        liveSearchJobs.set(searchId, { ...job });
+        return withPortalBudget(scrapeByPlatform(
+          db.platform as ScraperPlatform,
+          url,
+          searchValue,
+          effectiveSearchType,
+          db.id,
+          db.name,
+          queryId,
+          jobId,
+          db.jurisdiction
+        ));
+      });
 
       // Every adapter catches its own failure (browser launch, timeout, portal
       // change, login wall), records it on its scrape job and returns what it
@@ -328,7 +335,11 @@ export async function startLiveSearch(
     liveSearchJobs.set(searchId, { ...job });
     log(`Live search ${searchId} completed: ${job.totalResultsFound} total results across ${activeDbs.length} databases`, "scraper");
 
-    setTimeout(() => liveSearchJobs.delete(searchId), 5 * 60 * 1000);
+    // The search's per-portal scrape jobs go with it: nothing else ever removed them (audit 08 #12).
+    setTimeout(() => {
+      liveSearchJobs.delete(searchId);
+      for (const d of job.databases) scrapeJobs.delete(d.jobId);
+    }, 5 * 60 * 1000);
   });
 
   return job;
