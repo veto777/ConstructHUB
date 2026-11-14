@@ -224,6 +224,8 @@ export function TakePaymentDialog({
     onSuccess: (r: any) => {
       toast({ title: `${r?.number ?? "Invoice"} created`, description: `${money(r?.totalCents)} — take the payment below.` });
       if (r?.id) setInvoiceId(r.id);
+      // The server replays a repeated key (a retry never bills twice), so the next invoice needs a fresh one.
+      setIdem(uid());
       setNewInvOpen(false);
       setNewInv((f) => ({ ...f, percent: "", amount: "", discount: "", title: "" }));
       onChanged?.();
