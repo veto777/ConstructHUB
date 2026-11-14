@@ -277,17 +277,6 @@ export default function CrmSettingsPage() {
     onError: (e: any) => toast({ title: "Could not save text alerts", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
-  // Voice "check your email" nudge on estimate send — calls need no carrier
-  // campaign, so this works on any sender, including the shared number.
-  const saveVoiceNudge = useMutation({
-    mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { voiceNudge: on })).json(),
-    onSuccess: () => {
-      invalidateOrg();
-      toast({ title: "Voice nudge saved" });
-    },
-    onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
-  });
-
   // Confetti when a job is closed out (the PM's reward) — on unless the company turns it off.
   const saveCelebrations = useMutation({
     mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { celebrations: on })).json(),
@@ -1327,23 +1316,6 @@ export default function CrmSettingsPage() {
               onCheckedChange={(v) => saveSmsEstimates.mutate(v)}
               disabled={saveSmsEstimates.isPending || !smsStatus?.configured || smsStatus?.canTextClients === false}
               aria-label="Text estimates to clients" data-testid="switch-sms-estimates"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 border-t pt-3">
-            <div className="min-w-0">
-              <div className="text-sm font-medium">Call the client to check their email</div>
-              <p className="text-xs text-muted-foreground">
-                When you send a bid, also ring the client's phone with a short "your estimate is in your
-                inbox (or spam folder)" message. Calls need no carrier registration — this works on any
-                sender, including the shared number.
-              </p>
-            </div>
-            <Switch
-              checked={(org?.customFields as any)?.voiceNudge === true}
-              onCheckedChange={(v) => saveVoiceNudge.mutate(v)}
-              disabled={saveVoiceNudge.isPending}
-              aria-label="Call the client to check their email" data-testid="switch-voice-nudge"
             />
           </div>
 
