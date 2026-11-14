@@ -360,3 +360,13 @@ describe("migrate endpoints (dev server)", () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe("parseCsv header names stay unique", () => {
+  it("a generated suffix never collides with a header the file already has", async () => {
+    const { parseCsv } = await import("./migrate-lib");
+    const { headers } = parseCsv("Phone,Phone,Phone (2)\n1,2,3\n");
+    expect(new Set(headers).size).toBe(3);
+    expect(headers[0]).toBe("Phone");
+    expect(headers[2]).toBe("Phone (2)"); // the literal header keeps its own name and column
+  });
+});
