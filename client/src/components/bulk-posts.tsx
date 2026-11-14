@@ -55,7 +55,7 @@ export function BulkPosts({ locationId }: { locationId: number }) {
           setProgress(`Uploading ${i + 1} of ${files.length}…`);
           const fd = new FormData();
           fd.append("photo", files[i]); fd.append("pattern", "{business}-{n}"); fd.append("index", String(i));
-          const r = await fetch(`/api/gbp/content/${locationId}/upload`, { method: "POST", body: fd, credentials: "include" });
+          const r = await fetch(`/api/gbp/content/${locationId}/upload?bulk=1`, { method: "POST", body: fd, credentials: "include" });
           const photo = await r.json();
           if (!r.ok) throw new Error(photo.message || `Upload failed on photo ${i + 1}`);
           photoIds.push(photo.id);
