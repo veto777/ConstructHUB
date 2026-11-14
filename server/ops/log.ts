@@ -64,6 +64,18 @@ export const hasClientStatus: SafeErrorTest = (err) => {
 };
 
 /**
+ * What the global error handler (server/index.ts) tells the client. A body-parser error gets a fixed sentence (its
+ * message quotes the body); any 5xx gets GENERIC_500_MESSAGE, because an unhandled error's text is a Postgres
+ * message, a vendor's response or a stack line (audit 08 #10); a 4xx keeps the message the code raised it with.
+ */
+export function unhandledErrorMessage(err: unknown, status: number): string {
+  if (isBodyParserError(err)) return "The request body could not be read as JSON.";
+  if (!(status >= 400 && status < 500)) return GENERIC_500_MESSAGE;
+  const message = (err as { message?: unknown } | null)?.message;
+  return typeof message === "string" && message ? message : "Request failed";
+}
+
+/**
  * The catch-all answer of a route: `catch (err) { fail500(res, "Create folder failed:", err); }`.
  * An error `isSafe` vouches for is answered with its own message (and its own 4xx/5xx `status`, else 500) and
  * not logged — it is an expected outcome. Anything else is logged through logError and answered with

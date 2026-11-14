@@ -95,7 +95,7 @@ export function log(message: string, source = "express") {
 
 // The issue desk: a 500 a route answered by itself is recorded when the response finishes.
 import { watchHandledFailures, recordUnhandledError, recordProcessFailure } from "./ops/server-errors";
-import { logError, isBodyParserError } from "./ops/log";
+import { logError, unhandledErrorMessage } from "./ops/log";
 app.use(watchHandledFailures);
 
 // The request log (server/request-log.ts): method, path, status, duration, request id. Never a response body in
@@ -165,8 +165,8 @@ process.on("unhandledRejection", (reason) => {
       const status = typeof err.code === "string" && err.code.startsWith("LIMIT_") ? 413 : (err.status || err.statusCode || 500);
       // A body-parser error carries the raw request body (err.body) and quotes it in its message:
       // the journal gets its type/status/length only (ops/log.ts), the client a fixed sentence.
-      const isBodyError = isBodyParserError(err);
-      const message = isBodyError ? "The request body could not be read as JSON." : (err.message || "Internal Server Error");
+      // A 5xx answers a fixed sentence too: the detail (a Postgres message, a vendor's text) is logged below, not sent.
+      const message = unhandledErrorMessage(err, status);
 
       logError("Internal Server Error:", err);
       // The issue desk: any 5xx that reached this handler (route + method + error identity).

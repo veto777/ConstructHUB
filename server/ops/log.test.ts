@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The journal-safe error logger (server/ops/log.ts) that server/index.ts's error
 // handler and the process-level handlers print through: never a request body,
 // never a Postgres row, never a recipient address.
-import { errorLogFacts, fail500, GENERIC_500_MESSAGE, hasClientStatus, isBodyParserError, logError, safeErrorClasses } from "./log";
+import { errorLogFacts, fail500, GENERIC_500_MESSAGE, hasClientStatus, isBodyParserError, logError, safeErrorClasses, unhandledErrorMessage } from "./log";
 
 /** What body-parser throws for a malformed JSON body (node_modules/body-parser/lib/read.js: `body` is the raw request). */
 function bodyParserError(body: string) {
@@ -151,5 +151,22 @@ describe("fail500", () => {
       fail500(res, "x", err, test);
       expect(out).toEqual({ status: 500, body: { message: GENERIC_500_MESSAGE } });
     }
+  });
+});
+
+// Audit 08 #10: the global handler answered a 500 with the raw error text (Postgres messages included).
+describe("unhandledErrorMessage", () => {
+  it("never sends a 5xx error's own text", () => {
+    const pg = Object.assign(new Error('invalid input syntax for type integer: "NaN"'), { code: "22P02" });
+    expect(unhandledErrorMessage(pg, 500)).toBe(GENERIC_500_MESSAGE);
+    expect(unhandledErrorMessage(Object.assign(new Error("connect ECONNREFUSED 10.0.0.5:5432"), { status: 503 }), 503)).toBe(GENERIC_500_MESSAGE);
+    expect(unhandledErrorMessage(null, 500)).toBe(GENERIC_500_MESSAGE);
+  });
+
+  it("keeps a 4xx message and the fixed body-parser sentence", () => {
+    expect(unhandledErrorMessage(Object.assign(new Error("Not allowed"), { status: 403 }), 403)).toBe("Not allowed");
+    expect(unhandledErrorMessage(Object.assign(new Error("File too large"), { code: "LIMIT_FILE_SIZE" }), 413)).toBe("File too large");
+    expect(unhandledErrorMessage({}, 404)).toBe("Request failed");
+    expect(unhandledErrorMessage(bodyParserError('{"password":"hunter2"'), 400)).toBe("The request body could not be read as JSON.");
   });
 });
