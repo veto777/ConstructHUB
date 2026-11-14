@@ -80,9 +80,9 @@ export async function reconcileStripeEvent(event: Stripe.Event, stripe: Stripe):
     const creditDelta = Math.max(0, settledCents - refundedCents) - Math.max(0, pay.settled_cents - pay.refunded_cents);
     if (newlySettled && pay.estimate_id && !pay.invoice_id && creditDelta > 0) {
       const { rows: [invoice] } = await client.query(`select id from crm_invoices
-        where org_id=$1 and estimate_id=$2 and voided_at is null and status <> 'void'
-          and total_cents - retainage_cents - paid_cents >= $3
-        order by created_at, id limit 1 for update`, [pay.org_id,pay.estimate_id,pay.amount_cents]);
+        where org_id=$1 and estimate_id=$2 and customer_id=$4 and voided_at is null and status <> 'void'
+          and total_cents - coalesce(retainage_cents,0) - coalesce(paid_cents,0) >= $3
+        order by created_at, id limit 1 for update`, [pay.org_id,pay.estimate_id,pay.amount_cents,pay.customer_id]);
       if (invoice) {
         pay.invoice_id = invoice.id;
         await client.query("update crm_payments set invoice_id=$2 where id=$1", [pay.id,invoice.id]);
