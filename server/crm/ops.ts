@@ -32,7 +32,7 @@ import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMa
 import { requireCrmFeature, emitCrmEvent, queueCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { invoiceDefaultsFromOrg } from "./doc-defaults";
 import { autoSendPaymentReceipt } from "./receipts";
-import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent } from "./payment-guard";
+import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent, OPEN_SESSION_WINDOW_MIN } from "./payment-guard";
 import { completeReconcileTasks, clearingCents } from "./payment-reconcile";
 import { receiptSettingsOf, reconcileSettingsOf, MANUAL_PAYMENT_METHOD_VALUES } from "@shared/payment-settings";
 import { logActivity } from "./activity";
@@ -695,6 +695,18 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (inv.voidedAt) return res.status(409).json({ message: "Already voided." });
     if ((inv.paidCents ?? 0) > 0) {
       return res.status(409).json({ message: "Payments have been recorded against this invoice; it can't be voided." });
+    }
+    // A payment in flight is not on paidCents yet: a bank transfer still clearing, or a checkout page the client
+    // may still finish. Voiding now would let that money land on a void invoice with nothing saying so.
+    if ((await clearingCents({ invoiceId: inv.id })) > 0) {
+      return res.status(409).json({ message: "A bank transfer for this invoice is still clearing. Wait for it to settle or fail before voiding the invoice." });
+    }
+    const [openCheckout] = await db.select({ id: crmPayments.id }).from(crmPayments).where(and(
+      eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.invoiceId, inv.id), eq(crmPayments.status, "pending"),
+      sql`${crmPayments.createdAt} >= now() - make_interval(mins => ${OPEN_SESSION_WINDOW_MIN})`,
+    )).limit(1);
+    if (openCheckout) {
+      return res.status(409).json({ message: "The client has a payment page open for this invoice right now. Wait for it to finish (or about half an hour) before voiding the invoice." });
     }
     const [row] = await db.update(crmInvoices).set({
       voidedAt: new Date(), status: "void", updatedAt: new Date(),
