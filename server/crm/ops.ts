@@ -1351,7 +1351,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const [row] = await db.update(crmProjects)
       .set({ ...parsed.data, updatedAt: new Date() } as any)
       .where(eq(crmProjects.id, proj.id)).returning();
-    res.json(row);
+    res.json(stripMoney(ctx, row, { price: ["contractValueCents"], cost: ["budgetCents"] }));
   });
 
   // ══ PUBLIC API KEYS + WEBHOOKS ════════════════════════════════════════════
@@ -1559,8 +1559,8 @@ export function registerCrmPhaseRoutes(app: Express, getDevUser: GetUser): void 
     const parsed = z.object({
       name: z.string().min(1).max(150),
       sortOrder: z.number().int().min(0).max(999).default(0),
-      startDate: z.string().nullable().optional(),
-      endDate: z.string().nullable().optional(),
+      startDate: z.string().refine((v) => !v || !Number.isNaN(Date.parse(v)), "Enter a valid date.").nullable().optional(),
+      endDate: z.string().refine((v) => !v || !Number.isNaN(Date.parse(v)), "Enter a valid date.").nullable().optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid phase", issues: parsed.error.issues });
     const [proj] = await db.select().from(crmProjects)
