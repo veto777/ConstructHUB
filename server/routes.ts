@@ -2555,7 +2555,7 @@ export async function registerRoutes(
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
       if (!apiKey) return res.status(500).json({ message: "API key not configured" });
 
-      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry&key=${apiKey}`;
+      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(String(placeId))}&fields=geometry&key=${apiKey}`;
       const detailRes = await fetch(url);
       const data = await detailRes.json() as any;
 
@@ -2621,14 +2621,14 @@ export async function registerRoutes(
   // like any failed grid, gets its credits back. The status flip is one guarded UPDATE, so it refunds once.
   const RANKING_GRID_STALE_MS = 30 * 60_000;
   const rankingGridInFlight = new Set<number>();
-  async function closeStaleRankingGridScan<T extends { id: number; userId: number; gridSize: number; status: string; createdAt: Date }>(scan: T): Promise<T> {
+  async function closeStaleRankingGridScan<T extends { id: number; userId: number | null; gridSize: number; status: string; createdAt: Date }>(scan: T): Promise<T> {
     if (scan.status !== "running" || rankingGridInFlight.has(scan.id)) return scan;
     const started = new Date(scan.createdAt);
     if (!(Date.now() - started.getTime() > RANKING_GRID_STALE_MS)) return scan;
     const { rowCount } = await pool.query("UPDATE ranking_grid_scans SET status='failed' WHERE id=$1 AND status='running'", [scan.id]);
     if (!rowCount) return scan;
     const credits = gridCreditCost(scan.gridSize);
-    await refundReservation({ key: quotaKey(scan.userId, "rankings", monthKey(started)), remaining: credits }, credits);
+    if (scan.userId != null) await refundReservation({ key: quotaKey(scan.userId, "rankings", monthKey(started)), remaining: credits }, credits);
     console.warn(`[ranking-grid] scan ${scan.id} was left running by a restart: closed as failed, ${credits} credit(s) returned`);
     return { ...scan, status: "failed" };
   }
@@ -2900,6 +2900,7 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
+      if (!Number.isInteger(scanId)) return res.status(404).json({ message: "Scan not found" });
       const [scan] = await db.select().from(competitorScans).where(and(eq(competitorScans.id, scanId), eq(competitorScans.userId, userId)));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
       // Best-rated first, most-reviewed among equals; a listing with no rating yet goes last (Postgres puts
@@ -2938,6 +2939,7 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
+      if (!Number.isInteger(scanId)) return res.status(404).json({ message: "Scan not found" });
       // One transaction: ownership verified under a row lock first (a foreign id changes nothing),
       // an active scan cancelled and its month refunded, then listings and scan removed.
       const removed = await removeCompetitorScan(userId, scanId, new Date());
