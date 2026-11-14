@@ -603,11 +603,12 @@ export default function CrmClientPage() {
   });
 
   const { data: apptData } = useQuery<any>({
-    queryKey: ["/api/crm/appointments", "client-hub"],
+    queryKey: ["/api/crm/appointments", "client-hub", id],
     queryFn: async () => {
       const from = new Date(Date.now() - 30 * 86400000).toISOString();
       const to = new Date(Date.now() + 365 * 86400000).toISOString();
-      return (await apiRequest("GET", `/api/crm/appointments?from=${from}&to=${to}`, undefined)).json();
+      // This client's visits only: the org-wide list is capped and would drop later ones.
+      return (await apiRequest("GET", `/api/crm/appointments?from=${from}&to=${to}&customerId=${encodeURIComponent(id ?? "")}`, undefined)).json();
     },
     enabled: !!id,
   });
