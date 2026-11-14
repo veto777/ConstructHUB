@@ -2204,7 +2204,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         ...invoiceDocText(inv, org),
       },
       items: items.map((i) => ({
-        id: i.id, name: i.name, description: i.description, unit: i.unit,
+        // kind: a "discount" line is stored as a positive price; the page must show it as money off.
+        id: i.id, kind: i.kind, name: i.name, description: i.description, unit: i.unit,
         quantityMilli: i.quantityMilli, unitPriceCents: i.unitPriceCents,
         lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
       })),
