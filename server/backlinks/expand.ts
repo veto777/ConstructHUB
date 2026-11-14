@@ -9,7 +9,7 @@
 import * as cheerio from "cheerio";
 import type { BacklinkKind } from "@shared/backlinks";
 import { isExcluded, normalizeDomain } from "./discover";
-import { vetDeps } from "./vet";
+import { safeDecode, vetDeps } from "./vet";
 
 /** What a linked site says it is (its link text or host), as a Backlinks kind. Chambers and associations are "directory". */
 const RELATED: { re: RegExp; kind: BacklinkKind }[] = [
@@ -51,7 +51,7 @@ export function listPages(html: string, pageUrl: string, domain: string): string
     try { abs = new URL(String($(a).attr("href")), pageUrl); } catch { return; }
     const host = normalizeDomain(abs.href);
     if (!host || (host !== domain && !host.endsWith(`.${domain}`))) return;
-    if (LIST_PAGE.test(`${$(a).text()} ${decodeURIComponent(abs.pathname).replace(/[-_/]+/g, " ")}`.toLowerCase())) { abs.hash = ""; out.add(abs.href); }
+    if (LIST_PAGE.test(`${$(a).text()} ${safeDecode(abs.pathname).replace(/[-_/]+/g, " ")}`.toLowerCase())) { abs.hash = ""; out.add(abs.href); }
   });
   return [...out];
 }
