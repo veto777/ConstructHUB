@@ -481,7 +481,9 @@ export async function runRotatingSync(): Promise<void> {
     const accounts = await db
       .select()
       .from(lsaAccounts)
-      .where(eq(lsaAccounts.enabled, true))
+      // Only accounts whose owner is still connected: a disconnected owner's accounts are never synced, so
+      // (never touched, always oldest) they would otherwise fill every batch and starve everyone else.
+      .where(and(eq(lsaAccounts.enabled, true), sql`EXISTS (SELECT 1 FROM lsa_connections c WHERE c.user_id = ${lsaAccounts.userId} AND c.refresh_token IS NOT NULL)`))
       .orderBy(
         sql`(CASE WHEN ${lsaAccounts.lsaEnrolled} IS TRUE THEN 0 WHEN ${lsaAccounts.lsaEnrolled} IS NULL THEN 1 ELSE 2 END)`,
         sql`${lsaAccounts.lastSyncAt} ASC NULLS FIRST`,

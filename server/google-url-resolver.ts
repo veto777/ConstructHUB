@@ -25,6 +25,33 @@ export function isAllowedGoogleFetchTarget(urlStr: string): boolean {
   return /^(www\.|maps\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(host);
 }
 
+// A redirect hop may also land on another Google-owned google.com subdomain
+// (consent., search., business.), which the entry allowlist does not list.
+export function isAllowedGoogleRedirectTarget(urlStr: string): boolean {
+  if (isAllowedGoogleFetchTarget(urlStr)) return true;
+  try {
+    const u = new URL(urlStr);
+    return (u.protocol === "https:" || u.protocol === "http:") && u.hostname.toLowerCase().endsWith(".google.com");
+  } catch {
+    return false;
+  }
+}
+
+// SSRF guard for the headless-browser scraper: a URL may be opened in Chromium
+// only when its HOST is an allowlisted Google domain AND it is a Maps page.
+// A substring test is not enough: http://10.0.0.5/google.com/maps/... contains
+// "google.com/maps" but points at an internal host.
+export function isGoogleMapsPageUrl(urlStr: string | null | undefined): boolean {
+  if (!urlStr || !isAllowedGoogleFetchTarget(urlStr)) return false;
+  try {
+    const u = new URL(urlStr.trim());
+    if (!/^(www\.|maps\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(u.hostname.toLowerCase())) return false;
+    return u.pathname === "/maps" || u.pathname.startsWith("/maps/");
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveGoogleShortUrl(url: string): Promise<{ resolvedUrl: string; extractedQuery: string | null; kgmid: string | null; htmlBody: string | null; ogTitle: string | null; hexCid: string | null; decimalCid: string | null }> {
   const trimmed = url.trim();
   let resolvedUrl = trimmed;
@@ -38,11 +65,29 @@ export async function resolveGoogleShortUrl(url: string): Promise<{ resolvedUrl:
   if (isAllowedGoogleFetchTarget(trimmed)) {
     const ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
     try {
-      const res = await fetch(trimmed, {
-        redirect: "follow",
+      // Follow redirects by hand so every hop is checked against the Google
+      // host allowlist (redirect:"follow" would happily fetch an internal
+      // address a redirect pointed at). Stops at the last allowed URL.
+      let current = trimmed;
+      let res = await fetch(current, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(10000),
         headers: { "User-Agent": ua, "Accept-Language": "en-US,en;q=0.9", "Accept": "text/html,application/xhtml+xml" },
       });
-      resolvedUrl = res.url || trimmed;
+      for (let hop = 0; hop < 5 && res.status >= 300 && res.status < 400; hop++) {
+        const loc = res.headers.get("location");
+        if (!loc) break;
+        let next: string;
+        try { next = new URL(loc, current).toString(); } catch { break; }
+        if (!isAllowedGoogleRedirectTarget(next)) break;
+        current = next;
+        res = await fetch(current, {
+          redirect: "manual",
+          signal: AbortSignal.timeout(10000),
+          headers: { "User-Agent": ua, "Accept-Language": "en-US,en;q=0.9", "Accept": "text/html,application/xhtml+xml" },
+        });
+      }
+      resolvedUrl = current;
 
       try {
         const urlObj = new URL(resolvedUrl);

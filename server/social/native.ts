@@ -606,13 +606,29 @@ export class NativeClient implements SocialClient {
           await this.setSub(s.id, { attempts: s.attempts + 1 });
           return { state: "submitted", publicUrl: null, error: null };
         }
-        await this.setSub(s.id, { stage: "ig_publishing" });
-        const pub = await graph("POST", `${acct.external_id}/media_publish`, { creation_id: s.container_id }, token);
+        if (s.attempts > 60) return this.fail(s.id, "Instagram took too long to accept the post");
+        await this.setSub(s.id, { stage: "ig_publishing", attempts: 0 });
+        let pub: any;
+        try {
+          pub = await graph("POST", `${acct.external_id}/media_publish`, { creation_id: s.container_id }, token);
+        } catch (e) {
+          // Rate-limited: nothing was published, so the next check publishes the finished container again
+          // (counted, so it cannot go round forever).
+          if ((e as SocialError).status === 429) await this.setSub(s.id, { stage: "ig_container", attempts: s.attempts + 1 });
+          throw e;
+        }
         const m = await graph("GET", String(pub.id), { fields: "permalink" }, token).catch(() => null);
         await this.setSub(s.id, { stage: "published", external_id: String(pub.id), public_url: m?.permalink ?? null });
         return { state: "published", publicUrl: m?.permalink ?? null, error: null };
       }
-      if (s.stage === "ig_publishing" || s.stage === "sending") return { state: "submitted", publicUrl: null, error: null };
+      if (s.stage === "ig_publishing") {
+        // The publish call was cut off (a timeout or a gateway error), so whether it went out is unknown. It is
+        // not sent again; after a few checks the post is closed with a note to look at the account.
+        if (s.attempts >= 10) return this.fail(s.id, "Instagram did not confirm the post; check the account before posting again");
+        await this.setSub(s.id, { attempts: s.attempts + 1 });
+        return { state: "submitted", publicUrl: null, error: null };
+      }
+      if (s.stage === "sending") return { state: "submitted", publicUrl: null, error: null };
     } catch (e) {
       await this.markReconnect(acct.id, e);
       if ((e as SocialError).status === 429 || (e as SocialError).status === 502) return { state: "submitted", publicUrl: null, error: null };

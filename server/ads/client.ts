@@ -73,6 +73,8 @@ export class AdsClient implements AdsApi {
 export async function oauthTokens(body: Record<string,string>, http: typeof fetch = fetch) {
   const r = await http('https://oauth2.googleapis.com/token', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body: new URLSearchParams({client_id: process.env.GOOGLE_ADS_CLIENT_ID!, client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!, ...body}), signal: AbortSignal.timeout(20000)});
+  // Only Google refusing the grant (400/401) means "reconnect"; a busy or failing token endpoint is temporary.
+  if (!r.ok && r.status !== 400 && r.status !== 401) throw new AdsError('Google is not answering right now. Try again shortly.', 503);
   const t = await r.json();
   if (!r.ok || typeof t.access_token !== 'string' || (t.scope && !String(t.scope).split(' ').includes(ADS_SCOPE))) throw new AdsError('Google authorization failed. Reconnect and allow Google Ads access.', 401);
   return t;

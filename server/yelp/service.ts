@@ -56,13 +56,15 @@ async function trendFor(businessId: number): Promise<Trend> {
 
 async function fetchAndStore(userId: number, yelpId: string, opts: { notify?: boolean } = {}): Promise<YelpRow> {
   const { rows: [prev] } = await pool.query("SELECT id, review_count FROM yelp_businesses WHERE user_id=$1 AND yelp_id=$2", [userId, yelpId]);
-  const [biz, rev] = await Promise.all([yelpBusiness(yelpId), yelpReviews(yelpId).catch(() => ({ reviews: [] as YelpReview[], total: 0 }))]);
+  const [biz, fresh] = await Promise.all([yelpBusiness(yelpId), yelpReviews(yelpId).catch(() => null)]);
+  // A failed reviews call (rate limit, timeout) keeps the reviews already stored instead of wiping them.
+  const rev = fresh ?? { reviews: [] as YelpReview[], total: 0 };
   const { rows: [r] } = await pool.query(
     `INSERT INTO yelp_businesses(user_id,yelp_id,name,url,image_url,location,phone,rating,review_count,reviews,review_total,categories,category_aliases,photos,price,is_open_now,lat,lng,synced_at)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,now())
-     ON CONFLICT(user_id,yelp_id) DO UPDATE SET name=$3,url=$4,image_url=$5,location=$6,phone=$7,rating=$8,review_count=$9,reviews=$10,review_total=$11,categories=$12,category_aliases=$13,photos=$14,price=$15,is_open_now=$16,lat=$17,lng=$18,synced_at=now()
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10::jsonb,'[]'::jsonb),COALESCE($11::int,0),$12,$13,$14,$15,$16,$17,$18,now())
+     ON CONFLICT(user_id,yelp_id) DO UPDATE SET name=$3,url=$4,image_url=$5,location=$6,phone=$7,rating=$8,review_count=$9,reviews=COALESCE($10::jsonb,yelp_businesses.reviews),review_total=COALESCE($11::int,yelp_businesses.review_total),categories=$12,category_aliases=$13,photos=$14,price=$15,is_open_now=$16,lat=$17,lng=$18,synced_at=now()
      RETURNING *`,
-    [userId, biz.yelpId, biz.name, biz.url, biz.imageUrl, biz.location, biz.phone, biz.rating, biz.reviewCount, JSON.stringify(rev.reviews), rev.total,
+    [userId, biz.yelpId, biz.name, biz.url, biz.imageUrl, biz.location, biz.phone, biz.rating, biz.reviewCount, fresh ? JSON.stringify(fresh.reviews) : null, fresh ? fresh.total : null,
      JSON.stringify(biz.categories), JSON.stringify(biz.categoryAliases), JSON.stringify(biz.photos), biz.price, biz.isOpenNow, biz.coordinates?.latitude ?? null, biz.coordinates?.longitude ?? null]);
   await pool.query("INSERT INTO yelp_snapshots(business_id,rating,review_count) VALUES($1,$2,$3) ON CONFLICT(business_id,captured_on) DO UPDATE SET rating=$2,review_count=$3", [r.id, biz.rating, biz.reviewCount]);
   // New-review alert: the stored count went up since last sync.

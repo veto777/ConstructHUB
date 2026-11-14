@@ -301,6 +301,7 @@ export async function unlinkLocation(userId: number, id: number) {
     if (!rowCount) throw new GoogleError('invalid','Location not found',404);
     await c.query(`DELETE FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND google_review_id LIKE 'accounts/%/locations/%/reviews/%'`,[userId,id]);
     await c.query('DELETE FROM gbp_daily_metrics WHERE location_id=$1',[id]);
+    await c.query('DELETE FROM gbp_media WHERE location_id=$1',[id]);
     await c.query('DELETE FROM gbp_sync_status WHERE location_id=$1',[id]);
     await c.query('DELETE FROM gbp_guard WHERE user_id=$1 AND location_id=$2',[userId,id]);
     await c.query('DELETE FROM gbp_guard_changes WHERE user_id=$1 AND location_id=$2',[userId,id]);

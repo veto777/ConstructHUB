@@ -53,8 +53,10 @@ import { platformAccessGate, requirePlatformAccess } from "./platform-access";
 import { registerTrackingRoutes } from "./tracking-script";
 import { registerAdsConsultantRoutes } from "./ads-consultant";
 import { registerHubRoutes } from "./hub";
-import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
+import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, isGoogleMapsPageUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
+import { trackField, allowClickTrack } from "./click-guard-collector";
+import { cleanReviewPhotos } from "./review-photos";
 import { uploadToR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { registerPublicFileRoutes } from "./files/public-files";
 import { db, pool } from "./db";
@@ -1592,7 +1594,7 @@ export async function registerRoutes(
           try {
             scraped = await scrapeGoogleMapsBusiness({
               name: synthName,
-              mapsUrl: /google\.\w+\/maps/i.test(photoEffectiveUrl) ? photoEffectiveUrl : null,
+              mapsUrl: isGoogleMapsPageUrl(photoEffectiveUrl) ? photoEffectiveUrl : null,
               kgmid: kgmid || extractMapsDataKgmid(photoEffectiveUrl),
             });
           } catch {}
@@ -3818,10 +3820,26 @@ export async function registerRoutes(
       res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-      const { trackingId, fingerprint, deviceType, browser, os, screenResolution, language, timezone, referrer, landingPage, userAgent } = req.body;
+      // Public and unauthenticated: every field is a short string (click-guard-collector.ts); the body itself
+      // is capped in server/index.ts.
+      const b = req.body && typeof req.body === "object" ? req.body : {};
+      const trackingId = trackField(b.trackingId, "trackingId");
+      const fingerprint = trackField(b.fingerprint, "fingerprint");
+      const deviceType = trackField(b.deviceType, "deviceType");
+      const browser = trackField(b.browser, "browser");
+      const os = trackField(b.os, "os");
+      const screenResolution = trackField(b.screenResolution, "screenResolution");
+      const language = trackField(b.language, "language");
+      const timezone = trackField(b.timezone, "timezone");
+      const referrer = trackField(b.referrer, "referrer");
+      const landingPage = trackField(b.landingPage, "landingPage");
+      const userAgent = trackField(b.userAgent, "userAgent");
 
       if (!trackingId) {
         return res.status(400).json({ message: "Missing trackingId" });
+      }
+      if (!allowClickTrack(visitorIp(req))) {
+        return res.status(429).json({ message: "Too many requests" });
       }
 
       const domain = await storage.getTrackedDomainByTrackingId(trackingId);
@@ -3834,7 +3852,7 @@ export async function registerRoutes(
       const isBlocked = await storage.isIpBlocked(domain.id, ip);
 
       const suspicionReasons: string[] = [];
-      const ua = userAgent || req.headers["user-agent"] || "";
+      const ua = userAgent || trackField(req.headers["user-agent"], "userAgent") || "";
 
       for (const pattern of BOT_PATTERNS) {
         if (pattern.test(ua)) {
@@ -4479,9 +4497,8 @@ function main() {
       }
 
       const visitorIp = req.params.visitorIp;
-      const visits = await storage.getClickVisits(domain.id);
-      const visitorVisits = visits.filter(v => v.ipAddress === visitorIp)
-        .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime());
+      // This visitor's own visits, newest first (not the newest 1000 of the whole site filtered by IP).
+      const visitorVisits = await storage.getVisitsByIp(domain.id, visitorIp);
 
       if (visitorVisits.length === 0) {
         return res.status(404).json({ message: "Visitor not found" });
@@ -5448,6 +5465,9 @@ function main() {
       }
 
       if (typeof clientEmail !== "string" || !z.string().email().safeParse(clientEmail.trim()).success) return res.status(400).json({ message: "Valid client email required" });
+      // "Schedule for later" with a time that has already passed is refused rather than sent on the spot
+      // (a minute of slack for the click itself).
+      if (scheduledFor && !(new Date(scheduledFor).getTime() > Date.now() - 60_000)) return res.status(400).json({ message: "That time has already passed. Pick a later time, or turn off Schedule to send now." });
       if (await isReviewSuppressed(user.id, clientEmail)) return res.status(409).json({ message: "This recipient has unsubscribed from your review requests. Only the customer can resubscribe." });
 
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
@@ -5491,7 +5511,9 @@ function main() {
       if (await hiddenFromReviews(user.id, crmLink.crmOrgId, crmLink.crmCustomerId, String(clientEmail))) {
         return res.status(409).json({ message: "This client is hidden from review requests. Unhide them under Ready to ask to send one." });
       }
-      const uploadedPhotos = Array.isArray(photos) ? photos : [];
+      // Uploaded and Media Library photos only: these become image and download links on the public review page.
+      const uploadedPhotos = cleanReviewPhotos(photos);
+      if (!uploadedPhotos) return res.status(400).json({ message: "One of the attached photos could not be used. Remove it and attach it again." });
       if (uploadedPhotos.length + (crmLink.photos?.length ?? 0) > HOMEOWNER_PICK_MAX) return res.status(400).json({ message: `Up to ${HOMEOWNER_PICK_MAX} photos per review request.` });
 
       const token = randomUUID();
@@ -5526,7 +5548,16 @@ function main() {
         // Customer-facing link: always the configured public origin, never the request host —
         // a request sent from the CRM portal host would land the customer on the sign-in screen.
         const baseUrl = canonicalAppOrigin();
-        await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
+        try {
+          await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
+        } catch (sendErr: any) {
+          // A send that may have reached the customer keeps its row (their link must keep working).
+          if (sendErr?.ambiguous) throw sendErr;
+          // Nothing went out, so nothing is kept as "sent": the owner can press Send again without a duplicate.
+          logError("Review request email failed:", sendErr);
+          await storage.permanentlyDeleteReviewRequest(request.id).catch((e) => logError("Review request cleanup failed:", e));
+          return res.status(502).json({ message: "The email could not be sent. Check the address and try again." });
+        }
 
         const reminderSettings = await storage.getReminderSettings(user.id);
         // Reminders are a Team-and-up feature: a plan without the module sends the

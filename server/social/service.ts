@@ -766,6 +766,9 @@ export async function runSocialWorker(
       try {
         await workerUser(r.user_id, make, generate, r.business_id);
       } catch (e) {
+        // The owner is doing something in Social Media right now (the per-user lock): nothing is wrong with the
+        // connection, so nothing is pushed back; the next tick picks this business up again.
+        if (e instanceof SocialError && e.status === 409 && e.message.includes("busy")) continue;
         await pool.query("UPDATE social_settings SET next_at=now()+interval '1 hour',last_error=$3 WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[r.user_id,r.business_id,
           e instanceof SocialError && e.message === LEGACY_CONNECTION ? LEGACY_CONNECTION : "Connection unavailable; check Social Media > Accounts"]);
         await pool.query("UPDATE social_posts SET due_at=now()+interval '1 hour' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state IN ('queued','submitted','submitting')",[r.user_id,r.business_id]);

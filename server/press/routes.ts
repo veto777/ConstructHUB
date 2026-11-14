@@ -282,8 +282,10 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (!found) return;
       const { row } = found;
       if (!["draft", "ready", "changes_requested"].includes(row.status)) return res.status(409).json({ message: "A release that reached the wire cannot be cancelled here" });
-      if (row.order_id) await store.refundCredit(row.id);
-      res.json(await viewOf(await store.updateRelease(row.id, { status: "cancelled", send_at: null, send_for_me: false })));
+      // Status check, refund and cancel in one statement (store.cancelRelease): the status read above may be stale.
+      const cancelled = await store.cancelRelease(row.id);
+      if (!cancelled) return res.status(409).json({ message: "A release that reached the wire cannot be cancelled here" });
+      res.json(await viewOf(cancelled));
     } catch (err) { logError("[press] cancel:", err); res.status(500).json({ message: "Could not cancel" }); }
   });
 

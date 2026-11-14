@@ -69,6 +69,7 @@ export async function purgeGoogleData(userId: number, subject: string|null = nul
   const locs = `SELECT id FROM business_locations WHERE user_id=$1 AND ($2::text IS NULL OR gbp_google_subject=$2 OR gbp_google_subject IS NULL)`;
   await db.query(`DELETE FROM google_profile_reviews WHERE user_id=$1 AND google_review_id LIKE 'accounts/%/locations/%/reviews/%' AND location_id IN (${locs})`,[userId,subject]);
   await db.query(`DELETE FROM gbp_daily_metrics WHERE location_id IN (${locs})`,[userId,subject]);
+  await db.query(`DELETE FROM gbp_media WHERE location_id IN (${locs})`,[userId,subject]);
   await db.query(`DELETE FROM gbp_guard WHERE user_id=$1 AND location_id IN (${locs})`,[userId,subject]);
   await db.query(`DELETE FROM gbp_guard_changes WHERE user_id=$1 AND location_id IN (${locs})`,[userId,subject]);
   await db.query(`DELETE FROM gbp_reply_settings WHERE user_id=$1 AND location_id IN (${locs})`,[userId,subject]);

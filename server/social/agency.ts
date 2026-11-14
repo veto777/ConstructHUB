@@ -109,6 +109,7 @@ export async function runAgencyWorker(generate:Generate=generateText, sync=syncG
     try {
       const {rows:[lock]}=await c.query('SELECT pg_try_advisory_lock(8160,$1::int) locked',[job.id]);
       if(!lock.locked)continue;
+      let generationStarted=false;
       try {
         const fresh=await c.query("SELECT id FROM social_bulk_jobs WHERE id=$1 AND state='queued'",[job.id]);
         if(!fresh.rowCount)continue;
@@ -126,7 +127,7 @@ export async function runAgencyWorker(generate:Generate=generateText, sync=syncG
           if(job.connection_hash!==conn.client.hash)throw new SocialError('Connection changed after bulk request; review mapping and submit a new request',409);
         }
         if(job.kind==='post') {
-          await createPosts(job.user_id,{requestId:input.requestId,text:expandVariables(input.text!,b),destinations:job.destinations||[],mediaUrls:input.mediaUrls,draft:input.draft,...(input.scheduledTime?{scheduledTime:input.scheduledTime}:{})},job.business_id);
+          await createPosts(job.user_id,{requestId:input.requestId,text:expandVariables(input.text!,b),destinations:job.destinations||[],mediaUrls:input.mediaUrls,draft:input.draft,...(input.scheduledTime&&Date.parse(input.scheduledTime)>Date.now()?{scheduledTime:input.scheduledTime}:{})},job.business_id); // a time that passed while the job waited its turn posts now
         } else if(job.kind==='settings') {
           const {rows:[old]}=await c.query("SELECT settings FROM social_settings WHERE user_id=$1 AND business_id=$2",[job.user_id,job.business_id]);
           const override=input.cadences.find(c=>c.businessId===job.business_id);
@@ -135,11 +136,15 @@ export async function runAgencyWorker(generate:Generate=generateText, sync=syncG
         else {
           // Generation is never automatically retried after an interrupted paid call.
           await c.query("UPDATE social_bulk_jobs SET state='generating',error='Generation in progress or interrupted; inspect drafts before requesting again' WHERE id=$1",[job.id]);
-          await userLock(job.user_id,c=>generateDue(c,job.user_id,generate,true,job.business_id));
+          await userLock(job.user_id,c=>{generationStarted=true;return generateDue(c,job.user_id,generate,true,job.business_id);});
         }
         await c.query("UPDATE social_bulk_jobs SET state='done',error=NULL WHERE id=$1",[job.id]);
       } catch(e) {
-        if(e instanceof SocialError&&e.status===409&&e.message.includes('busy'))continue;
+        if(e instanceof SocialError&&e.status===409&&e.message.includes('busy')) {
+          // The owner lock was busy before generation began: nothing was spent, so the job waits its turn again.
+          if(!generationStarted)await c.query("UPDATE social_bulk_jobs SET state='queued',error=NULL WHERE id=$1 AND state='generating'",[job.id]);
+          continue;
+        }
         await c.query("UPDATE social_bulk_jobs SET state='failed',error=$2 WHERE id=$1 AND state<>'cancelled'",[job.id,e instanceof SocialError?e.message:e instanceof z.ZodError?'Check business destinations and settings':'Could not complete business operation; review settings and retry']);
       } finally {await c.query('SELECT pg_advisory_unlock(8160,$1::int)',[job.id]);}
     } finally {c.release();}
