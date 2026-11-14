@@ -86,7 +86,7 @@ export type DivisionTaxRates = {
 
 // The estimate create schema accepts 0..3000 bps (30%); never inject a rate
 // the route would then reject.
-const clampBps = (n: number) => Math.min(3000, Math.max(0, Math.round(n)));
+const clampBps = (n: number) => Math.min(3000, Math.max(0, n));
 
 /** Read custom_fields->taxRates off a division row, tolerating junk. */
 export function divisionTaxRates(customFields: unknown): DivisionTaxRates | null {
@@ -106,17 +106,9 @@ export function divisionTaxRates(customFields: unknown): DivisionTaxRates | null
 }
 
 /** 920 → "9.2%", 888 → "8.88%", 0 → "0%". */
-export const fmtBps = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
+export const fmtBps = (bps: number) => `${Number((bps / 100).toFixed(4))}%`;
 const fmtPct = (pct: number) => `${Number(pct.toFixed(4))}%`;
-/**
- * The official rate as the label prints it. An estimate stores whole basis points, so a published rate with more
- * decimals (NJ 6.625%) is charged at the nearest 0.01% (6.63%): the label then leads with the rate actually charged
- * and names the published one, instead of printing a rate the estimate does not use (audit 08 #2).
- */
-const officialRateLabel = (off: OfficialRate) => {
-  const bps = clampBps(off.rateBps);
-  return Math.abs(bps - off.ratePct * 100) < 1e-6 ? fmtPct(off.ratePct) : `${fmtBps(bps)} (rounded from ${fmtPct(off.ratePct)})`;
-};
+const officialRateLabel = (off: OfficialRate) => fmtPct(off.ratePct);
 
 /** "No tax on job" → "no tax on job", but "GET on contractor" / "T&M …" keep their capitals. */
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
@@ -341,7 +333,7 @@ async function stampExplicitRate(estimateId: string): Promise<void> {
   }).from(crmEstimates).where(eq(crmEstimates.id, estimateId)).limit(1);
   if (!est) return;
   const r = await resolveEstimateTaxRate(est.orgId, { customerId: est.customerId, projectId: est.projectId });
-  const record = r.bps === est.taxRateBps
+  const record = Math.abs(r.bps - est.taxRateBps) < 1e-6
     ? taxSourceRecord(r)
     : { source: "manual", bps: est.taxRateBps, suggested: taxSourceRecord(r) };
   await stampTaxSource(est.orgId, estimateId, record);

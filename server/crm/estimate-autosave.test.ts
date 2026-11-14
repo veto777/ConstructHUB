@@ -251,3 +251,11 @@ describe.skipIf(!lane)("autosaved drafts through the CRM routes (lane Postgres)"
     expect((await call(`/api/crm/estimates/${randomUUID()}/autosave`, undefined, "DELETE")).status).toBe(404);
   });
 });
+
+it("round trips all four published percent decimals through the editor", async () => {
+  const { pctTextToBps, snapshotFromEstimate } = await import("@shared/estimate-draft");
+  for (const bps of [662.5, 618.75, 663, 920]) {
+    const snap = snapshotFromEstimate({ taxRateBps: bps }, []);
+    expect(pctTextToBps(snap.taxPct)).toBe(bps);
+  }
+});

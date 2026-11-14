@@ -1117,7 +1117,7 @@ export default function CrmClientPage() {
   }, [id, orgForDraft?.id]);
 
   // Totals: shared/estimate-totals.ts, the same function the server recomputes with (tax after discounts).
-  const taxBps = Math.round(parseFloat(taxPct || "0") * 100);
+  const taxBps = Math.round(parseFloat(taxPct || "0") * 10000) / 100;
   const cdLine = contractorDiscountLine(tabDiscount, tabItems);
   const totals = computeApprovalTotals([...tabItems, ...(cdLine ? [cdLine] : [])], taxBps, []);
   const subtotal = totals.subtotalCents;
@@ -2390,7 +2390,7 @@ export default function CrmClientPage() {
                             <div><span className="text-muted-foreground">Estimate:</span> <span className="font-medium">{e.number} · {e.title}</span></div>
                             <div><span className="text-muted-foreground">Total:</span> <span className="font-medium">{money(e.totalCents)}</span>
                               {e.depositCents ? <> · <span className="text-muted-foreground">deposit</span> <span className="font-medium">{money(e.depositCents)}</span></> : null}
-                              {" "}· <span className="text-muted-foreground">tax</span> <span className="font-medium">{((e.taxRateBps ?? 0) / 100).toString()}%</span></div>
+                              {" "}· <span className="text-muted-foreground">tax</span> <span className="font-medium">{String(Number(((e.taxRateBps ?? 0) / 100).toFixed(4)))}%</span></div>
                             <div className="text-muted-foreground">The client gets an email with a link to view and approve it.</div>
                           </div>
                         ),

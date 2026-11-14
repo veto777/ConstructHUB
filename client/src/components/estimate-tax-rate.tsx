@@ -30,7 +30,7 @@ export function useEstimateTaxRate(customerId: string | null | undefined, enable
 }
 
 /** Percent text for a Tax % input: 920 → "9.2", 888 → "8.88". */
-export const bpsToPctText = (bps: number) => String(Number((bps / 100).toFixed(2)));
+export const bpsToPctText = (bps: number) => String(Number((bps / 100).toFixed(4)));
 
 /** The line under Tax %: where the rate came from, and whether the user changed it. */
 export function TaxRateNote({ rate, loading, currentBps, savedBps }: {

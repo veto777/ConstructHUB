@@ -227,7 +227,7 @@ const orgPatchSchema = z.object({
   }).nullable().optional(),
   defaultDepositBps: z.number().int().min(0).max(10000).nullable().optional(),
   // Org-wide fallback sales-tax rate (basis points) — see server/crm/tax.ts.
-  defaultTaxRateBps: z.number().int().min(0).max(3000).nullable().optional(),
+  defaultTaxRateBps: z.number().multipleOf(0.01).min(0).max(3000).nullable().optional(),
   // The company theme accent — one of the 20 presets in shared/theme-colors.ts,
   // merged INTO custom_fields as themeColor (null clears back to the default
   // orange). Unknown ids are rejected.

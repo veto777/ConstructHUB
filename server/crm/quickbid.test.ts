@@ -181,7 +181,7 @@ describe("POST /api/crm/quick-bid (dev server)", () => {
       );
       expect(rows[0].subtotal_cents).toBe(lineCents);
       expect(rows[0].total_cents).toBe(ok.body.estimate.totalCents);
-      expect(rows[0].tax_rate_bps).toBe(taxBps);
+      expect(Number(rows[0].tax_rate_bps)).toBe(taxBps);
     } finally {
       // The customer hard-delete takes the whole tree (estimate + items +
       // events); measurements and price book rows go by hand.
