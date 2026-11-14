@@ -150,6 +150,20 @@ describe("resolveTaxRateBps — official city rates and construction treatment",
     expect(r.label).toMatch(/^Austin, TX · 8\.25% \(TX Comptroller, Q4 2026\) — TX: .+ — check$/);
   });
 
+  // Audit 08 #2: an estimate stores whole basis points, so NJ's 6.625% is charged as 6.63%. Until the stored rate
+  // carries more decimals, the label must name the rate the estimate really uses, not only the published one.
+  it("a published rate that does not fit whole basis points is labelled with the rate actually charged", () => {
+    const r = resolveTaxRateBps({
+      city: "Newark", state: "NJ",
+      official: official({ state: "NJ", city: null, county: null, locationCode: null, kind: "state", ratePct: 6.625, rateBps: 663, source: "SST NJ rate/boundary files" }),
+    });
+    expect(r).toMatchObject({ bps: 663, source: "official" });
+    expect(r.label).toContain("Newark, NJ · 6.63% (rounded from 6.625%) (SST NJ rate/boundary files, Q4 2026)");
+    // A rate that fits is printed exactly as before.
+    const exact = resolveTaxRateBps({ city: "Bellingham", state: "WA", official: official() });
+    expect(exact.label).toMatch(/^Bellingham, WA · 9\.2% \(WA DOR, Q4 2026\)/);
+  });
+
   it("a taxable state whose table isn't loaded yet → default, and the line says so", () => {
     const r = resolveTaxRateBps({ city: "Honolulu", state: "HI", official: { loaded: false, match: null }, orgDefaultTaxRateBps: 450 });
     expect(r).toMatchObject({ bps: 450, source: "org", fallbackReason: "not_loaded" });
