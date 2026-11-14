@@ -90,7 +90,7 @@ export async function loadStateRates(
          SELECT $1, j.city, j.city_key, j.county, j.location_code, j.zip, j.kind, j.rate_pct, j.rate_bps,
            j.effective_date::date, $2, $3, $4
          FROM jsonb_to_recordset($5::jsonb) AS j(city text, city_key text, county text, location_code text, zip text,
-           kind text, rate_pct numeric, rate_bps integer, effective_date text)`,
+           kind text, rate_pct numeric, rate_bps numeric, effective_date text)`,
         [r.state, r.sourceName, r.sourceUrl, r.periodLabel, JSON.stringify(chunk.map((x) => ({
           city: x.city, city_key: x.city ? cityKey(x.city) : null, county: x.county, location_code: x.locationCode,
           zip: x.zip, kind: x.kind, rate_pct: x.ratePct, rate_bps: pctToBps(x.ratePct), effective_date: x.effectiveDate,
@@ -200,7 +200,7 @@ export function pickCityRow<T extends { zip: string | null; kind: string; rate_b
   return { row: pool.find((r) => r.rate_bps === best[0])!, varies: true };
 }
 
-const SELECT_ROW = `SELECT state, city, county, location_code, zip, kind, rate_pct::text, rate_bps, effective_date::text,
+const SELECT_ROW = `SELECT state, city, county, location_code, zip, kind, rate_pct::text, rate_bps::double precision AS rate_bps, effective_date::text,
   source, source_url, period_label FROM sales_tax_rates`;
 
 /** One location code's row (WA DOR codes are unique per state). */

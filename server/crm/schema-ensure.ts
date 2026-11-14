@@ -552,6 +552,21 @@ export async function ensureCrmSchema(): Promise<void> {
   // the approval-time totals, and the offers table itself.
   await pool.query(`
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS default_tax_rate_bps integer;
+    -- Widen only; stored rates and document totals are never recomputed.
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+        AND table_name = 'crm_estimates' AND column_name = 'tax_rate_bps' AND data_type = 'integer') THEN
+        ALTER TABLE crm_estimates ALTER COLUMN tax_rate_bps TYPE numeric(8,2);
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+        AND table_name = 'crm_invoices' AND column_name = 'tax_rate_bps' AND data_type = 'integer') THEN
+        ALTER TABLE crm_invoices ALTER COLUMN tax_rate_bps TYPE numeric(8,2);
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+        AND table_name = 'crm_orgs' AND column_name = 'default_tax_rate_bps' AND data_type = 'integer') THEN
+        ALTER TABLE crm_orgs ALTER COLUMN default_tax_rate_bps TYPE numeric(8,2);
+      END IF;
+    END $$;
     ALTER TABLE crm_divisions ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_divisions ADD COLUMN IF NOT EXISTS website text;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS approved_total_cents integer;

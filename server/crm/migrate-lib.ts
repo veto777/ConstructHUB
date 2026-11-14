@@ -90,12 +90,15 @@ export function parseCsv(text: string): ParsedCsv {
   // A blank header ("Name,Email,") gets a name, and a repeated one a suffix:
   // the mapping step keys columns by header text, so an empty or duplicate
   // name cannot be picked (and an empty option value crashes the picker).
-  const seen = new Map<string, number>();
+  // A generated name must not collide with a header the file already has ("Phone,Phone,Phone (2)").
+  const taken = new Set(nonEmpty[0].map((h) => h.trim()).filter(Boolean));
+  const used = new Set<string>();
   const headers = nonEmpty[0].map((h, i) => {
     const base = h.trim() || `Column ${i + 1}`;
-    const n = (seen.get(base) ?? 0) + 1;
-    seen.set(base, n);
-    return n === 1 ? base : `${base} (${n})`;
+    let name = base;
+    for (let n = 2; used.has(name) || (name !== h.trim() && taken.has(name)); n++) name = `${base} (${n})`;
+    used.add(name);
+    return name;
   });
   const rows = nonEmpty.slice(1).map((r) => {
     const out = r.slice(0, headers.length);

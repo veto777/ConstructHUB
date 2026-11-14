@@ -21,6 +21,14 @@ export const SALES_TAX_DDL: readonly string[] = [
     source_url text NOT NULL,
     period_label text NOT NULL
   )`,
+  // Correct the cached reference rate from the published percent, including unchanged seed loads.
+  `DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+      AND table_name = 'sales_tax_rates' AND column_name = 'rate_bps' AND data_type = 'integer') THEN
+      ALTER TABLE sales_tax_rates ALTER COLUMN rate_bps TYPE numeric(8,2);
+      UPDATE sales_tax_rates SET rate_bps = rate_pct * 100;
+    END IF;
+  END $$`,
   `CREATE INDEX IF NOT EXISTS sales_tax_rates_state_city_idx ON sales_tax_rates (state, city_key)`,
   `CREATE TABLE IF NOT EXISTS sales_tax_rate_loads (
     state varchar(2) PRIMARY KEY,

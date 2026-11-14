@@ -6,6 +6,7 @@ import { ensurePaymentLedgerSchema } from "./payment-ledger-schema";
 import type Stripe from "stripe";
 
 const org = randomUUID(), customer = randomUUID(), invoice = randomUUID();
+const estimate = randomUUID();
 const account = `acct_${randomUUID()}`, session = `cs_${randomUUID()}`, intent = `pi_${randomUUID()}`, charge = `ch_${randomUUID()}`;
 const list = vi.fn();
 const retrieve = vi.fn().mockResolvedValue({ latest_charge: { id: charge } });
@@ -25,23 +26,85 @@ beforeAll(async () => {
   await ensurePaymentLedgerSchema();
   await pool.query(`insert into crm_orgs(id,name,owner_user_id) values($1,'Ledger fixture',1)`,[org]);
   await pool.query(`insert into crm_customers(id,org_id,display_name,portal_token) values($1,$2,'Ledger client',gen_random_uuid())`,[customer,org]);
+  await pool.query(`insert into crm_estimates(id,org_id,customer_id,public_token) values($1,$2,$3,gen_random_uuid())`,[estimate,org,customer]);
   await pool.query(`insert into crm_invoices(id,org_id,customer_id,public_token,total_cents,status) values($1,$2,$3,gen_random_uuid(),1000,'sent')`,[invoice,org,customer]);
 });
 beforeEach(async () => {
   await pool.query('delete from crm_payment_refunds where org_id=$1',[org]);
   await pool.query('delete from crm_stripe_events where org_id=$1',[org]);
   await pool.query('delete from crm_payments where org_id=$1',[org]);
-  await pool.query("update crm_invoices set paid_cents=0,status='sent',paid_at=null where id=$1",[invoice]);
+  await pool.query("update crm_invoices set paid_cents=0,status='sent',paid_at=null,estimate_id=null,retainage_cents=0,total_cents=1000,voided_at=null where id=$1",[invoice]);
   await recordCheckoutPayment({ orgId: org, customerId: customer, invoiceId: invoice, amountCents: 1000 }, { id: session, payment_intent: null } as Stripe.Checkout.Session, account);
   list.mockReset().mockResolvedValue({ data: [{ id: session }] });
 });
 afterAll(async () => {
-  for (const table of ['crm_payment_refunds','crm_payment_accounts','crm_stripe_events','crm_payments','crm_invoices','crm_customers']) await pool.query(`delete from ${table} where org_id=$1`,[org]);
+  for (const table of ['crm_payment_refunds','crm_payment_accounts','crm_stripe_events','crm_payments','crm_invoices','crm_estimate_events','crm_estimates','crm_customers']) await pool.query(`delete from ${table} where org_id=$1`,[org]);
   await pool.query('delete from crm_orgs where id=$1',[org]);
   await pool.end();
 });
 
 describe('Stripe settlement — mocked provider, real Postgres transactions', () => {
+  it.each([1000, 1500])('attaches a late estimate deposit once with invoice total %i', async total => {
+    await pool.query('update crm_payments set invoice_id=null,estimate_id=$2 where org_id=$1',[org,estimate]);
+    await reconcileStripeEvent(completed(false), stripe);
+    await pool.query('update crm_invoices set estimate_id=$2,total_cents=$3 where id=$1',[invoice,estimate,total]);
+    const e = success();
+    await Promise.all([e,e,completed(true)].map(e => reconcileStripeEvent(e,stripe)));
+    const { payment, inv } = await snapshot();
+    expect(payment.invoice_id).toBe(invoice);
+    expect(inv.paid_cents).toBe(1000);
+    expect(inv.status).toBe(total === 1000 ? 'paid' : 'partial');
+  });
+  it('chooses the oldest fitting live invoice and skips it once paid', async () => {
+    const small = randomUUID(), newer = randomUUID(), secondSession = `cs_${randomUUID()}`;
+    await pool.query('update crm_payments set invoice_id=null,estimate_id=$2 where org_id=$1',[org,estimate]);
+    await pool.query("update crm_invoices set estimate_id=$2,created_at=now()-interval '2 days' where id=$1",[invoice,estimate]);
+    await pool.query(`insert into crm_invoices(id,org_id,customer_id,estimate_id,public_token,total_cents,status,created_at)
+      values($1,$3,$4,$5,gen_random_uuid(),500,'sent',now()-interval '3 days'),
+            ($2,$3,$4,$5,gen_random_uuid(),1000,'sent',now())`,[small,newer,org,customer,estimate]);
+    try {
+      await recordCheckoutPayment({ orgId: org, customerId: customer, estimateId: estimate, amountCents: 1000 },
+        { id: secondSession } as Stripe.Checkout.Session, account);
+      await reconcileStripeEvent(success(),stripe);
+      expect((await pool.query('select invoice_id from crm_payments where checkout_session_id=$1',[session])).rows[0].invoice_id).toBe(invoice);
+      await Promise.all([
+        reconcileStripeEvent(completed(true),stripe),
+        reconcileStripeEvent(event('checkout.session.async_payment_succeeded', { id: secondSession, payment_status: 'paid' }),stripe),
+      ]);
+      const { rows } = await pool.query('select id,paid_cents from crm_invoices where id=any($1::varchar[])',[ [invoice,small,newer] ]);
+      expect(Object.fromEntries(rows.map(r => [r.id,r.paid_cents]))).toEqual({ [invoice]: 1000, [small]: 0, [newer]: 1000 });
+    } finally {
+      await pool.query('delete from crm_invoices where id=any($1::varchar[])',[[small,newer]]);
+    }
+  });
+  it('never overcredits when two estimate deposits settle concurrently', async () => {
+    const secondSession = `cs_${randomUUID()}`;
+    await pool.query('update crm_payments set invoice_id=null,estimate_id=$2 where org_id=$1',[org,estimate]);
+    await pool.query('update crm_invoices set estimate_id=$2 where id=$1',[invoice,estimate]);
+    await recordCheckoutPayment({ orgId: org, customerId: customer, estimateId: estimate, amountCents: 1000 },
+      { id: secondSession } as Stripe.Checkout.Session, account);
+    await Promise.all([
+      reconcileStripeEvent(success(),stripe),
+      reconcileStripeEvent(event('checkout.session.async_payment_succeeded', { id: secondSession, payment_status: 'paid' }),stripe),
+    ]);
+    expect((await snapshot()).inv.paid_cents).toBe(1000);
+    const { rows } = await pool.query('select invoice_id,status from crm_payments where org_id=$1',[org]);
+    expect(rows.filter(r => r.invoice_id === invoice)).toHaveLength(1);
+    expect(rows.filter(r => r.invoice_id === null)).toHaveLength(1);
+    expect(rows.every(r => r.status === 'succeeded')).toBe(true);
+  });
+  it.each(['retainage', 'paid', 'void', 'missing'])('leaves a late deposit unattached when no invoice fits: %s', async reason => {
+    await pool.query('update crm_payments set invoice_id=null,estimate_id=$2 where org_id=$1',[org,estimate]);
+    if (reason !== 'missing') await pool.query('update crm_invoices set estimate_id=$2 where id=$1',[invoice,estimate]);
+    if (reason === 'retainage') await pool.query('update crm_invoices set retainage_cents=1 where id=$1',[invoice]);
+    if (reason === 'paid') await pool.query('update crm_invoices set paid_cents=1 where id=$1',[invoice]);
+    if (reason === 'void') await pool.query("update crm_invoices set status='void',voided_at=now() where id=$1",[invoice]);
+    await reconcileStripeEvent(success(),stripe);
+    const { payment, inv } = await snapshot();
+    expect(payment.invoice_id).toBeNull();
+    expect(payment.status).toBe('succeeded');
+    expect(inv.paid_cents).toBe(reason === 'paid' ? 1 : 0);
+  });
   it('settles delayed ACH by Checkout ID without losing the session identifier', async () => {
     await reconcileStripeEvent(completed(false), stripe);
     expect((await snapshot()).payment.status).toBe('processing');

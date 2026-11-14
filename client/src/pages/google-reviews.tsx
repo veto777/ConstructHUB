@@ -2173,7 +2173,7 @@ function GoogleProfileReviewsTab() {
   const [ratingFilter, setRatingFilter] = useState("all");
   const [responseFilter, setResponseFilter] = useState("all");
   // A new filter or search starts at the first page (the old page may not exist in the new result).
-  useEffect(() => { setReviewOffset(0); }, [locationFilter, ratingFilter, responseFilter, searchQuery, f.params]);
+  useEffect(() => { setReviewOffset(0); }, [locationFilter, ratingFilter, responseFilter, searchQuery, f.params.toString()]); // the object is new on every render; its text is not
   const [expandedReviewId, setExpandedReviewId] = useState<number | null>(null);
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");

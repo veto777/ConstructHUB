@@ -118,18 +118,27 @@ export function publicPayLimit(req: Request, res: Response, next: NextFunction):
 // ── Idempotency for recorded payments ───────────────────────────────────────
 
 const IDEMPOTENCY_TTL_MS = 15 * 60 * 1000;
-type Remembered = { at: number; status: number; body: unknown } | { at: number; inflight: true };
+type Remembered = { at: number; print: string; status: number; body: unknown } | { at: number; print: string; inflight: true };
 const remembered = new Map<string, Remembered>();
 
 function idemKey(req: Request, orgId: string): string | null {
   const raw = req.headers["idempotency-key"];
   const key = Array.isArray(raw) ? raw[0] : raw;
   if (!key || typeof key !== "string" || key.length < 8 || key.length > 128) return null;
-  // The body is part of the key: a retry repeats the same request, so it still replays; a different request that
-  // happens to reuse a key (a page loaded before the form rotated its key per write) is a new write, not a replay.
-  let body = "";
-  try { body = createHash("sha1").update(JSON.stringify(req.body ?? null)).digest("hex").slice(0, 16); } catch { body = ""; }
-  return `${orgId}:${req.path}:${key}:${body}`;
+  return `${orgId}:${req.path}:${key}`;
+}
+
+/**
+ * What the request asks for, apart from the proof photo: a retry uploads its photo again and gets a new
+ * attachment id, but it is still the same payment. Stored with the claim so a DIFFERENT request that reuses a
+ * key (a page loaded before the form rotated its key per write) is refused, never replayed as the first one and
+ * never written a second time.
+ */
+function bodyPrint(req: Request): string {
+  try {
+    const b = req.body && typeof req.body === "object" ? { ...(req.body as Record<string, unknown>), proofAttachmentId: undefined } : req.body ?? null;
+    return createHash("sha1").update(JSON.stringify(b)).digest("hex").slice(0, 16);
+  } catch { return ""; }
 }
 
 function sweep(now: number) {
@@ -141,6 +150,7 @@ export type IdempotencyClaim =
   | { kind: "none" }
   | { kind: "replay"; status: number; body: unknown }
   | { kind: "inflight" }
+  | { kind: "mismatch" }
   | { kind: "claimed" };
 
 /**
@@ -155,18 +165,20 @@ export function claimIdempotent(req: Request, orgId: string): IdempotencyClaim {
   const now = Date.now();
   const hit = remembered.get(k);
   if (hit && now - hit.at <= IDEMPOTENCY_TTL_MS) {
+    if (hit.print !== bodyPrint(req)) { console.warn(`[payments-guard] idempotency key reused for a different ${req.method} ${req.path} for org ${orgId}`); return { kind: "mismatch" }; }
     if ("inflight" in hit) { console.warn(`[payments-guard] duplicate in-flight ${req.method} ${req.path} for org ${orgId}`); return { kind: "inflight" }; }
     console.warn(`[payments-guard] replayed idempotent ${req.method} ${req.path} for org ${orgId}`);
     return { kind: "replay", status: hit.status, body: hit.body };
   }
   sweep(now);
-  remembered.set(k, { at: now, inflight: true });
+  remembered.set(k, { at: now, print: bodyPrint(req), inflight: true });
   return { kind: "claimed" };
 }
 
 /** Answer an in-flight / replay claim on the response; true when the caller must stop. */
 export function answerIdempotent(res: Response, req: Request, claim: IdempotencyClaim): boolean {
   if (claim.kind === "replay") { res.status(claim.status).json(claim.body); return true; }
+  if (claim.kind === "mismatch") { res.status(409).json({ message: "This form was already submitted. Refresh the page to see the result before sending anything else." }); return true; }
   if (claim.kind === "inflight") { refuse(res, req, "duplicate in-flight idempotency key", 409); return true; }
   return false;
 }
@@ -175,7 +187,7 @@ export function answerIdempotent(res: Response, req: Request, claim: Idempotency
 export function rememberIdempotent(req: Request, orgId: string, status: number, body: unknown): void {
   const k = idemKey(req, orgId);
   if (!k) return;
-  remembered.set(k, { at: Date.now(), status, body });
+  remembered.set(k, { at: Date.now(), print: bodyPrint(req), status, body });
 }
 
 /** The work failed or was refused: free the key so an honest retry can go through. */

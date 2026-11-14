@@ -241,7 +241,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       projectId: z.string().nullable().optional(),
       estimateId: z.string().nullable().optional(),
       title: z.string().max(200).default("Invoice"),
-      taxRateBps: z.number().int().min(0).max(3000).default(0),
+      taxRateBps: z.number().multipleOf(0.01).min(0).max(3000).default(0),
       retainageBps: z.number().int().min(0).max(2000).default(0),
       dueInDays: z.number().int().min(0).max(365).default(30),
       notes: z.string().max(8000).nullable().optional(),

@@ -187,3 +187,9 @@ describe("bundle offer on the option being shown", () => {
       .toBe(BUNDLE_CONDITIONS);
   });
 });
+
+it("keeps published fractional rates in public previews and approval totals", () => {
+  expect(computeApprovalTotals([line(1_000_000)], 662.5, [])).toMatchObject({ taxCents: 66250, totalCents: 1066250 });
+  expect(computeApprovalTotals([line(1_000_000)], 618.75, [])).toMatchObject({ taxCents: 61875, totalCents: 1061875 });
+  expect(computeApprovalTotals([line(1_000_000)], 663, [])).toMatchObject({ taxCents: 66300, totalCents: 1066300 });
+});

@@ -10,6 +10,7 @@ process.env.CALL_ASSISTANT_OVERAGE_BILLING = "on";
 const mocks = vi.hoisted(() => ({
   rows: [] as any[][],
   updates: [] as any[],
+  updatePredicates: [] as any[],
   inserts: [] as any[],
   prices: new Map<string, any>(),
   pricesList: vi.fn(),
@@ -63,7 +64,7 @@ vi.mock("./db", () => {
   return {
     db: {
       select: () => ({ from: () => ({ where }) }),
-      update: () => ({ set: (set: any) => ({ where: async () => { mocks.updates.push(set); } }) }),
+      update: () => ({ set: (set: any) => ({ where: async (predicate: any) => { mocks.updates.push(set); mocks.updatePredicates.push(predicate); } }) }),
       insert: () => ({ values: async (values: any) => { mocks.inserts.push(values); } }),
     },
     pool: {
@@ -126,13 +127,14 @@ vi.mock("./voice/number-release", () => ({ afterSubscriptionChange: mocks.afterS
 
 import * as stripeModule from "./stripe";
 import { registerStripeRoutes } from "./stripe";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { cancellationOf, withBillingLock } from "./billing/sync";
 import { resetPriceCache } from "./billing/prices";
 import { COURSE_BUNDLE, DFY_CATALOG } from "./catalog";
 import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, TRIAL_DAYS, agencyMonthlyCents, LEGACY_AGENCY_BASE_CENTS } from "@shared/plans";
 
 const routes = new Map<string, Function>();
-registerStripeRoutes({
+registerStripeRoutes({ patch: () => {}, put: () => {}, delete: () => {},
   get: (path: string, handler: Function) => routes.set(`GET ${path}`, handler),
   post: (path: string, handler: Function) => routes.set(path, handler),
 } as any);
@@ -163,6 +165,7 @@ const liveRow = (extra: any = {}) => customerRow({ stripeSubscriptionId: "sub_li
 beforeEach(() => {
   mocks.rows.length = 0;
   mocks.updates.length = 0;
+  mocks.updatePredicates.length = 0;
   mocks.inserts.length = 0;
   mocks.prices.clear();
   mocks.recentAuth = true;
@@ -224,7 +227,7 @@ describe("GET /api/stripe/plans", () => {
     expect(res.body.addons.map((a: any) => a.key)).toEqual(Object.keys(ADDONS));
     // Unlimited has no location cap (-1); the graduated bands stay to read stored 2026-09-30 rows.
     expect(res.body.agency).toEqual({ includedLocations: -1, bands: AGENCY_LOCATION_BANDS, selfServeMaxLocations: 500 });
-    expect(res.body.trialDays).toBe(1);
+    expect(res.body.trialDays).toBe(TRIAL_DAYS);
     expect(res.body.salesThresholdCents).toBe(100000);
     expect(JSON.stringify(res.body)).not.toMatch(/platinum|gold|"free"/i);
   });
@@ -451,7 +454,10 @@ describe("POST /api/stripe/create-checkout", () => {
     mocks.rows.push([]);
     expect((await request("/api/stripe/create-checkout", { plan: "starter" })).code).toBe(200);
     expect(mocks.customers).toHaveBeenCalledWith({ email: "billing@example.invalid", metadata: { userId: "42" } });
-    expect(mocks.inserts[0]).toMatchObject({ userId: 42, stripeCustomerId: "cus_new", plan: "free", status: "inactive" });
+    expect(mocks.sql.find(q => /INSERT INTO subscriptions/.test(q.text))).toEqual({
+      text: "INSERT INTO subscriptions(user_id,stripe_customer_id,plan,status) VALUES($1,$2,'free','inactive')",
+      values: [42, "cus_new"],
+    });
     expect(mocks.checkout.mock.calls[0][0].customer).toBe("cus_new");
   });
 });
@@ -1359,7 +1365,10 @@ describe("webhook maps the subscription's items onto the row", () => {
     mocks.rows.push([liveRow()]);
     await webhook({ type: "customer.subscription.deleted", data: { object: { id: "sub_live", customer: "cus_test" } } });
     expect(mocks.updates[0]).toEqual({ status: "canceled", plan: "free", addons: {}, agencyLocations: null, billingInterval: null });
-    expect(cancellationWrites()).toEqual([[5, null, null, null]]);
+    expect(cancellationWrites()).toEqual([["sub_live", null, null, null]]);
+    expect(new PgDialect().sqlToQuery(mocks.updatePredicates[0])).toMatchObject({
+      sql: '"subscriptions"."stripe_subscription_id" = $1', params: ["sub_live"],
+    });
     // The Call Assistant number is part of the service: the release decision runs for the account, after the row is written.
     expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
   });
@@ -1399,12 +1408,12 @@ describe("webhook maps the subscription's items onto the row", () => {
     const sub = agencyYearly("sub_new", "active") as any;
     sub.cancel_at_period_end = true;
     await webhook({ type: "customer.subscription.updated", data: { object: sub } });
-    expect(cancellationWrites()).toEqual([[5, true, new Date(1893456000 * 1000), null]]);
+    expect(cancellationWrites()).toEqual([["sub_new", true, new Date(1893456000 * 1000), null]]);
     // Resumed in the portal: the flag clears.
     mocks.sql.length = 0;
     mocks.rows.push([liveRow({ stripeSubscriptionId: "sub_new" })]);
     await webhook({ type: "customer.subscription.updated", data: { object: agencyYearly("sub_new", "active") } });
-    expect(cancellationWrites()).toEqual([[5, false, null, null]]);
+    expect(cancellationWrites()).toEqual([["sub_new", false, null, null]]);
   });
 
   it("a late event for an ended subscription never ends a live trial-code grant; a live subscription replaces it", async () => {

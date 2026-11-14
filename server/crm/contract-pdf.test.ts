@@ -347,3 +347,10 @@ describe("the estimate page shows the warranty at the top (source guard)", () =>
     expect(page.slice(block - 400, block)).toContain("{company.warrantyText && (");
   });
 });
+
+it("prints the exact NJ tax cents without rounding the rate again", async () => {
+  const pdf = await buildContractPdf({ ...INPUT, estimate: { ...INPUT.estimate,
+    subtotalCents: 1_000_000, discountCents: 0, taxCents: 66250, totalCents: 1066250, approvedTotalCents: 1066250,
+  }, approval: { optionalDiscountCents: 0, taxCents: 66250 } }, { compress: false });
+  expect(flat(pdf)).toContain("$662.50");
+});

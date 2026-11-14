@@ -2,7 +2,10 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 // Kimi QA: with no STRIPE_SECRET_KEY, "Get Started" on /pricing surfaced the
 // SDK's raw "Neither apiKey nor config.authenticator provided". Checkout routes
 // now answer 503 in plain words, before any Stripe call, and nothing is charged.
-const mocks = vi.hoisted(() => ({ constructed: 0, verify: vi.fn(), rows: [] as any[][] }));
+const mocks = vi.hoisted(() => {
+  delete process.env.STRIPE_SECRET_KEY;
+  return { constructed: 0, verify: vi.fn(), rows: [] as any[][] };
+});
 vi.mock("stripe", () => ({ default: class {
   constructor() { mocks.constructed++; }
   checkout = { sessions: { create: vi.fn() } };
@@ -19,7 +22,7 @@ vi.mock("./crm/beta", () => ({ isBetaUser: async () => false }));
 import { registerStripeRoutes, PaymentsNotConfiguredError } from "./stripe";
 
 const routes = new Map<string, Function>();
-registerStripeRoutes({ get: () => {}, post: (path: string, handler: Function) => routes.set(path, handler) } as any);
+registerStripeRoutes({ patch: () => {}, put: () => {}, delete: () => {}, get: () => {}, post: (path: string, handler: Function) => routes.set(path, handler) } as any);
 async function request(path: string, body: any, headers: any = {}, rawBody?: Buffer) {
   const res: any = { code: 200, status(n: number) { this.code = n; return this; }, json(data: any) { this.body = data; return this; }, send(data: any) { this.body = data; return this; } };
   await routes.get(path)!({ user: { id: 42, email: "payments@example.invalid" }, body, headers, rawBody }, res);
