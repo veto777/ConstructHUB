@@ -3479,7 +3479,9 @@ export async function registerRoutes(
   app.post("/api/citations/campaigns/:id/run", async (req, res) => {
     if (!(await requireCitationsPlan(req, res))) return;
     try {
-      const user = (req as any).user;
+      // The workspace owner for an agency team member, as on every other citation route.
+      const user = getDevUser(req, res);
+      if (!user) return;
       const id = parseInt(req.params.id);
       await ensureChecklist(id, user.id);
       res.json({ message: "Checklist ready", campaignId: id });
