@@ -29,7 +29,7 @@ import { db } from "../db";
 import {
   crmActivityLog, crmPaymentAccounts, crmPayments, crmEstimates, crmInvoices, crmCustomers, crmOrgs,
 } from "@shared/schema";
-import { and, eq, isNull, desc, sql, inArray } from "drizzle-orm";
+import { and, eq, isNull, asc, desc, sql, inArray } from "drizzle-orm";
 import { loadActorDirectory } from "./actors";
 import { clientActor, systemActor, UNRECORDED_TEAM_ACTOR, type CrmActor } from "@shared/crm-actor";
 import { requireOrg, requirePermission } from "./tenancy";
@@ -40,14 +40,39 @@ import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
 import { reconcileSettingsOf, receiptSettingsOf, parseDayList, offlinePaymentInstructionsOf, offlinePaymentInstructionsFor } from "@shared/payment-settings";
 import { resolveEstimateDivision, resolveInvoiceDivision } from "./divisions";
-import { paymentWriteLimit, paymentSettingsLimit, publicPayLimit } from "./payment-guard";
+import { paymentWriteLimit, paymentSettingsLimit, publicPayLimit, OPEN_SESSION_WINDOW_MIN, checkoutExpiresAt } from "./payment-guard";
+import { clearingCents } from "./payment-reconcile";
 import { uploadToR2, getR2Url } from "../r2";
 import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
 
 type GetUser = (req: any, res: any) => any;
 
-/** A checkout session stays open for a while; don't stack a second one on top. */
-const OPEN_SESSION_WINDOW_MIN = 30;
+// A checkout session stays open for a while (payment-guard.ts CHECKOUT_SESSION_LIFETIME_MIN, set as its
+// expires_at); don't stack a second one on top. OPEN_SESSION_WINDOW_MIN outlasts that lifetime.
+
+/** Said by every pay / payment-link route while a bank transfer for the document is still clearing. */
+const CLEARING_MESSAGE = (doc: "invoice" | "estimate") =>
+  `A bank transfer for this ${doc} is still clearing. It can take a few business days to settle, and there is nothing more to pay until it does.`;
+
+/**
+ * Once an estimate has a live invoice, its money is collected ON the invoice (the manual record route has the
+ * same rule, payment-reconcile.ts): a payment taken on the estimate after that is never credited to the invoice,
+ * which then stays unpaid and goes overdue. `payable` is the oldest sent invoice of the same client with
+ * something due, so the client can be pointed at it.
+ */
+async function liveInvoicesForEstimate(est: { id: string; orgId: string; customerId: string }) {
+  const rows = await db.select({
+    id: crmInvoices.id, number: crmInvoices.number, publicToken: crmInvoices.publicToken, sentAt: crmInvoices.sentAt,
+    customerId: crmInvoices.customerId, totalCents: crmInvoices.totalCents,
+    retainageCents: crmInvoices.retainageCents, paidCents: crmInvoices.paidCents,
+  }).from(crmInvoices)
+    .where(and(eq(crmInvoices.orgId, est.orgId), eq(crmInvoices.estimateId, est.id), isNull(crmInvoices.voidedAt)))
+    .orderBy(asc(crmInvoices.createdAt));
+  if (!rows.length) return null;
+  const payable = rows.find((i) => i.sentAt && i.publicToken && i.customerId === est.customerId
+    && i.totalCents - (i.retainageCents ?? 0) - (i.paidCents ?? 0) >= 50) ?? null;
+  return { first: rows[0], payable };
+}
 
 async function hasOpenSession(where: any): Promise<boolean> {
   // Compare against the DATABASE clock, not a JS Date: these columns are
@@ -529,6 +554,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     try {
       const session = await stripe.checkout.sessions.create({
         mode: "payment", payment_method_types: methods,
+        expires_at: checkoutExpiresAt(), // never payable after the open-session guard stops watching it
         customer_email: customer?.email ?? undefined,
         line_items: lineItems,
         success_url: `${base}${opts.successPath}?paid=1`,
@@ -570,10 +596,12 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (inv.voidedAt) return res.status(409).json({ message: "This invoice has been voided." });
     const amount = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
     if (amount < 50) return res.status(400).json({ message: "Nothing left to pay on this invoice." });
+    // A bank transfer that is still clearing is not on paidCents yet: never take the same balance twice.
+    if ((await clearingCents({ invoiceId: inv.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("invoice") });
     // Same double-pay guard as the public flow: one open session at a time.
     if (await hasOpenSession(eq(crmPayments.invoiceId, inv.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this invoice. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this invoice. Finish it (or wait about half an hour) before starting another.",
       });
     }
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
@@ -614,11 +642,18 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay on this estimate." });
     const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
-      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+      .where(and(eq(crmPayments.estimateId, est.id), inArray(crmPayments.status, ["succeeded", "partially_refunded"]))).limit(1);
     if (settled.length) return res.status(409).json({ message: "This estimate has already been paid." });
+    const invoiced = await liveInvoicesForEstimate(est);
+    if (invoiced) {
+      return res.status(409).json({
+        message: `This estimate is already invoiced as ${invoiced.first.number ?? "an invoice"}. Take the payment on that invoice instead.`,
+      });
+    }
+    if ((await clearingCents({ estimateId: est.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("estimate") });
     if (await hasOpenSession(eq(crmPayments.estimateId, est.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this estimate. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this estimate. Finish it (or wait about half an hour) before starting another.",
       });
     }
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
@@ -855,10 +890,12 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (amount < 50) return res.status(400).json({ message: "Nothing left to pay." });
     // Double-pay guard: one open checkout session at a time per invoice. The
     // webhook hasn't landed yet while a session is open, so paidCents alone
-    // can't stop a client from paying twice in two tabs.
+    // can't stop a client from paying twice in two tabs. Nor can it while a
+    // bank transfer is clearing: that money is not on paidCents until it settles.
+    if ((await clearingCents({ invoiceId: inv.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("invoice") });
     if (await hasOpenSession(eq(crmPayments.invoiceId, inv.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this invoice. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this invoice. Finish it (or wait about half an hour) before starting another.",
       });
     }
 
@@ -898,6 +935,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     try {
       const session = await stripe.checkout.sessions.create({
         mode: "payment", payment_method_types: methods,
+        expires_at: checkoutExpiresAt(), // never payable after the open-session guard stops watching it
         customer_email: cust?.email ?? undefined,
         line_items: lineItems,
         success_url: `${base}/i/${t}?paid=1`,
@@ -936,15 +974,25 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay." });
 
-    // Double-pay guard: the deposit must not be collectable twice.
+    // Double-pay guard: the deposit must not be collectable twice (a deposit
+    // with a small refund on it, "partially_refunded", is still paid).
     const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
-      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+      .where(and(eq(crmPayments.estimateId, est.id), inArray(crmPayments.status, ["succeeded", "partially_refunded"]))).limit(1);
     if (settled.length) {
       return res.status(409).json({ message: "This estimate has already been paid." });
     }
+    // Invoiced already: the payment belongs on the invoice, or the invoice never shows it.
+    const invoiced = await liveInvoicesForEstimate(est);
+    if (invoiced) {
+      return res.status(409).json(invoiced.payable
+        ? { message: `This job is now billed by invoice. Please pay ${invoiced.payable.number ? `invoice ${invoiced.payable.number}` : "that invoice"} instead.`,
+            invoiceUrl: `/i/${invoiced.payable.publicToken}` }
+        : { message: "This job is now billed by invoice. Please contact us to arrange payment." });
+    }
+    if ((await clearingCents({ estimateId: est.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("estimate") });
     if (await hasOpenSession(eq(crmPayments.estimateId, est.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this estimate. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this estimate. Finish it (or wait about half an hour) before starting another.",
       });
     }
 
@@ -990,6 +1038,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         payment_method_types: methods,
+        expires_at: checkoutExpiresAt(), // never payable after the open-session guard stops watching it
         customer_email: cust?.email ?? undefined,
         line_items: lineItems,
         success_url: `${base}/e/${t}?paid=1`,

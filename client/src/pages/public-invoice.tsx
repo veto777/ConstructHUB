@@ -104,7 +104,9 @@ export default function PublicInvoicePage() {
   // checkout finished — an ACH debit can still be settling, and the parameter
   // itself is trivially forgeable, so it must never render as "Paid".
   const settled = Boolean(inv.paidAt);
-  const processing = !settled && new URLSearchParams(window.location.search).get("paid") === "1";
+  // The server also reports a bank transfer that is still clearing (processingCents): a reopened email link has
+  // no ?paid=1, and offering Pay again there would take the same balance twice.
+  const processing = !settled && (Number(inv.processingCents ?? 0) > 0 || new URLSearchParams(window.location.search).get("paid") === "1");
   // Only a LOADED pay-info can say no rail is offered; while it loads (or if
   // it fails) the plain Pay button stays and the server answers honestly.
   const noOnlineRail = Boolean(payInfo) && !payInfo.cardAvailable && !payInfo.achAvailable;
@@ -234,8 +236,9 @@ export default function PublicInvoicePage() {
                         {i.description && <div className="text-xs text-muted-foreground mt-0.5">{i.description}</div>}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
-                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{money(i.unitPriceCents)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">{money(i.lineTotalCents)}</td>
+                      {/* A discount line is stored as a positive price: show it as money off, never as a charge. */}
+                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{i.kind === "discount" ? "−" : ""}{money(i.unitPriceCents)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">{i.kind === "discount" ? "−" : ""}{money(i.lineTotalCents)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -248,6 +251,12 @@ export default function PublicInvoicePage() {
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium tabular-nums">{money(inv.subtotalCents)}</span>
                 </div>
+                {inv.discountCents > 0 && (
+                  <div className="flex justify-between" data-testid="row-invoice-discount">
+                    <span className="text-muted-foreground">Discount</span>
+                    <span className="font-medium tabular-nums">−{money(inv.discountCents)}</span>
+                  </div>
+                )}
                 {inv.taxCents > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tax</span>

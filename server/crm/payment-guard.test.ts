@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   paymentWriteLimit, paymentSettingsLimit, publicPayLimit, replayIdempotent, rememberIdempotent, _resetIdempotency, PAYMENT_LIMITS,
   claimIdempotent, releaseIdempotent,
+  CHECKOUT_SESSION_LIFETIME_MIN, OPEN_SESSION_WINDOW_MIN, checkoutExpiresAt,
 } from "./payment-guard";
 
 function req(over: Partial<any> = {}) {
@@ -100,5 +101,17 @@ describe("idempotent payment writes", () => {
     const r = req({ headers: { "idempotency-key": "short" } });
     rememberIdempotent(r as any, "org1", 201, { ok: true });
     expect(replayIdempotent(r as any, "org1")).toBeNull();
+  });
+});
+
+// Audit 2026-11-14 H2: a Checkout session must not stay payable after the open-session guard stops watching it.
+describe("checkout session lifetime", () => {
+  it("expires just above Stripe's 30-minute minimum, and the guard outlasts it", () => {
+    expect(CHECKOUT_SESSION_LIFETIME_MIN).toBeGreaterThan(30);
+    expect(CHECKOUT_SESSION_LIFETIME_MIN).toBeLessThanOrEqual(35);
+    expect(OPEN_SESSION_WINDOW_MIN).toBeGreaterThan(CHECKOUT_SESSION_LIFETIME_MIN);
+    const now = Date.UTC(2026, 10, 14, 12, 0, 0);
+    expect(checkoutExpiresAt(now)).toBe(now / 1000 + CHECKOUT_SESSION_LIFETIME_MIN * 60);
+    expect(Number.isInteger(checkoutExpiresAt())).toBe(true);
   });
 });

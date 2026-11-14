@@ -224,6 +224,8 @@ export function TakePaymentDialog({
     onSuccess: (r: any) => {
       toast({ title: `${r?.number ?? "Invoice"} created`, description: `${money(r?.totalCents)} — take the payment below.` });
       if (r?.id) setInvoiceId(r.id);
+      // The server replays a repeated key (a retry never bills twice), so the next invoice needs a fresh one.
+      setIdem(uid());
       setNewInvOpen(false);
       setNewInv((f) => ({ ...f, percent: "", amount: "", discount: "", title: "" }));
       onChanged?.();
@@ -415,7 +417,9 @@ export function TakePaymentDialog({
         <span className="text-muted-foreground tabular-nums" data-testid="text-new-invoice-preview">
           {newInvPreview.disc > 0 ? <>{money(newInvPreview.draw)} − {money(newInvPreview.disc)} discount = </> : null}
           <strong className="text-foreground">{money(newInvPreview.total)}</strong>{sourceEstimate && newInv.mode !== "full" ? ` of ${money(newInvPreview.base)} signed` : ""}
-          {sourceEstimate && (sourceEstimate.taxRateBps ?? 0) > 0 ? " before tax" : ""}
+          {/* Only a typed dollar amount is before tax (the server adds tax on top and caps it at the signed amount
+              before tax); a percentage or the full amount is a share of the signed total, tax included. */}
+          {sourceEstimate && newInv.mode === "amount" && (sourceEstimate.taxRateBps ?? 0) > 0 ? " (tax included). The amount you typed is before tax; tax is added on the invoice." : ""}
           {sourceEstimate && (payments ?? []).some((p) => p.estimateId === sourceEstimate.id && !p.invoiceId && DEPOSIT_TAKEN.includes(p.status)) ? " · the deposit already received is credited to this invoice" : ""}
         </span>
         <div className="flex gap-2">

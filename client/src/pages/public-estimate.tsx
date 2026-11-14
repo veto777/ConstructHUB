@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { isSameTerms } from "@shared/terms-dedupe";
-import { amountDueCents, previewEstimatePage, totalsFromBases, sumLineBases, PAY_IN_FULL_CODE } from "@shared/estimate-totals";
+import { amountDueCents, hasPayInFull, previewEstimatePage, totalsFromBases, sumLineBases, PAY_IN_FULL_CODE } from "@shared/estimate-totals";
 import { effectiveOffer, bundleRuleOf, SCOPE_CATEGORY_LABEL, type BundleRule, type ScopeCategory } from "@shared/scope-category";
 import { autoTitleFrom } from "@shared/estimate-draft";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -133,6 +133,8 @@ function PayCard({ token, company, estimate, payInfo }: {
         body: JSON.stringify(method ? { method } : {}),
       });
       const j = await r.json().catch(() => ({}));
+      // Already invoiced: the server points at the invoice to pay (a same-site /i/ path only).
+      if (!r.ok && typeof j.invoiceUrl === "string" && j.invoiceUrl.startsWith("/i/")) return { url: j.invoiceUrl };
       if (!r.ok) throw new Error(j.message || "Could not start payment");
       return j;
     },
@@ -155,7 +157,8 @@ function PayCard({ token, company, estimate, payInfo }: {
     );
   }
 
-  if (returned === "1") {
+  // estimate.paymentProcessing: the server saw a bank transfer still clearing (a reopened link has no ?paid=1).
+  if (returned === "1" || estimate.paymentProcessing) {
     return (
       <Card className="border-primary/50 bg-primary/5">
         <CardContent className="p-5 flex items-start gap-3">
@@ -185,7 +188,8 @@ function PayCard({ token, company, estimate, payInfo }: {
     <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="text-lg">
-          {estimate.depositCents ? "Pay your deposit" : "Pay in full"}
+          {/* A pay-in-full signature is charged the whole signed total: not a deposit. */}
+          {estimate.depositCents && !hasPayInFull(estimate.selectedDiscounts) ? "Pay your deposit" : "Pay in full"}
         </CardTitle>
         <CardDescription>
           {noOnlineRail
@@ -198,7 +202,7 @@ function PayCard({ token, company, estimate, payInfo }: {
           <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1.5" data-testid="text-online-pay-unavailable">
             <p>
               Online payment isn't available for this estimate. To pay the {money(amount)}
-              {estimate.depositCents ? " deposit" : ""}, contact {company.name}
+              {estimate.depositCents && !hasPayInFull(estimate.selectedDiscounts) ? " deposit" : ""}, contact {company.name}
               {company.phone || company.email ? ":" : " directly."}
             </p>
             {company.phone && (

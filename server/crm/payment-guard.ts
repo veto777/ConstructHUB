@@ -36,6 +36,25 @@ import { allow } from "./client-auth";
 /** The caller's IP as Express resolved it (trust-proxy aware), never a raw header. */
 const clientIp = (req: Request): string => String(req.ip || req.socket?.remoteAddress || "unknown");
 
+/**
+ * How long a hosted Checkout session we create stays payable. Stripe's minimum is 30 minutes from creation and
+ * its default is 24 hours; without an explicit expiry a link stays live long after the "one open checkout" guard
+ * stopped watching it, and the same balance can be paid twice. One minute above the minimum absorbs clock skew.
+ */
+export const CHECKOUT_SESSION_LIFETIME_MIN = 31;
+/** The "one open checkout at a time" guard: it must outlast the session it guards, so a little longer. */
+export const OPEN_SESSION_WINDOW_MIN = CHECKOUT_SESSION_LIFETIME_MIN + 2;
+/** `expires_at` (unix seconds) for a Checkout session created now. */
+export function checkoutExpiresAt(nowMs: number = Date.now()): number {
+  return Math.floor(nowMs / 1000) + CHECKOUT_SESSION_LIFETIME_MIN * 60;
+}
+/**
+ * A bank transfer (ACH) that finished checkout is "processing" until it settles or fails days later. While one is
+ * clearing, the same balance must not be paid or recorded again. Bounded, so a transfer whose outcome never
+ * reached us cannot lock a document forever (ACH settles or fails within a few business days).
+ */
+export const CLEARING_WINDOW_DAYS = 21;
+
 /** Budgets per 15-minute window. */
 export const PAYMENT_LIMITS = {
   /** Public pay / pay-info: per IP + document token. */

@@ -25,7 +25,7 @@ import {
   crmNotificationChannel,
   crmClientTokens,
 } from "@shared/schema";
-import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
+import { and, eq, desc, asc, sql, isNull, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, resolveClientCustomerIds } from "./client-auth";
 import { sendWithFallback } from "../email";
@@ -56,6 +56,7 @@ import { autoTitleFrom } from "@shared/estimate-draft";
 import { lineBases, optionDocument } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
+import { clearingCents } from "./payment-reconcile";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
@@ -627,9 +628,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }
 
     // Server-side paid flag — the client must never infer "paid" from the
-    // ?paid=1 redirect parameter alone.
+    // ?paid=1 redirect parameter alone. A deposit with a small refund on it
+    // ("partially_refunded") is still paid: the page must not offer it again.
     const settledPayments = await db.select({ id: crmPayments.id }).from(crmPayments)
-      .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
+      .where(and(eq(crmPayments.estimateId, est.id), inArray(crmPayments.status, ["succeeded", "partially_refunded"]))).limit(1);
 
     // The client must always see WHO their salesperson is and how to reach
     // them — the estimate writer first, the project's sales rep as fallback.
@@ -693,7 +695,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       preview: preview || undefined, // read-only: the page hides approve/pay
       answerBlock: answerBlock ?? undefined,
       salesRep,
-      estimate: { ...view.estimate, paid: settledPayments.length > 0 },
+      // paymentProcessing: a bank transfer finished checkout and is still clearing. The page must say so (and
+      // hide Pay) from the server's word, not only from the ?paid=1 redirect that a reopened link no longer has.
+      estimate: { ...view.estimate, paid: settledPayments.length > 0, paymentProcessing: !settledPayments.length && (await clearingCents({ estimateId: est.id })) > 0 },
       // A tiered bundle shows what THESE lines earn (or "not available" + why); the approve route recomputes it.
       // basePercentBps + rule let the page re-price a tiered offer for the option being viewed or the scopes ticked
       // (shared effectiveOffer, the same function the server uses on approve).
@@ -2192,12 +2196,16 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         taxCents: inv.taxCents, totalCents: inv.totalCents,
         retainageCents: inv.retainageCents, paidCents: inv.paidCents, refundedCents: refundSummary.refundedCents,
         dueCents: due, dueAt: inv.dueAt, paidAt: inv.paidAt, notes: inv.notes,
+        // A bank transfer that finished checkout and is still clearing: not on paidCents yet, but the page must
+        // not offer the same balance again (a reopened email link has no ?paid=1 to say so).
+        processingCents: await clearingCents({ invoiceId: inv.id }),
         createdAt: inv.createdAt,
         // Footer, warranty and terms as copied onto this invoice (doc-defaults.ts).
         ...invoiceDocText(inv, org),
       },
       items: items.map((i) => ({
-        id: i.id, name: i.name, description: i.description, unit: i.unit,
+        // kind: a "discount" line is stored as a positive price; the page must show it as money off.
+        id: i.id, kind: i.kind, name: i.name, description: i.description, unit: i.unit,
         quantityMilli: i.quantityMilli, unitPriceCents: i.unitPriceCents,
         lineTotalCents: Math.round((i.unitPriceCents * i.quantityMilli) / 1000),
       })),
