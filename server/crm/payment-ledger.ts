@@ -78,6 +78,16 @@ export async function reconcileStripeEvent(event: Stripe.Event, stripe: Stripe):
     const refundDelta = refundedCents - pay.refunded_cents;
     const principalRefundDelta = Math.min(refundedCents, pay.amount_cents) - Math.min(pay.refunded_cents, pay.amount_cents);
     const creditDelta = Math.max(0, settledCents - refundedCents) - Math.max(0, pay.settled_cents - pay.refunded_cents);
+    if (newlySettled && pay.estimate_id && !pay.invoice_id && creditDelta > 0) {
+      const { rows: [invoice] } = await client.query(`select id from crm_invoices
+        where org_id=$1 and estimate_id=$2 and voided_at is null and status <> 'void'
+          and total_cents - retainage_cents - paid_cents >= $3
+        order by created_at, id limit 1 for update`, [pay.org_id,pay.estimate_id,pay.amount_cents]);
+      if (invoice) {
+        pay.invoice_id = invoice.id;
+        await client.query("update crm_payments set invoice_id=$2 where id=$1", [pay.id,invoice.id]);
+      }
+    }
     if (refundDelta > 0) {
       await client.query(`insert into crm_payment_refunds(org_id,payment_id,invoice_id,account_id,event_id,charge_id,amount_cents,invoice_credit_cents,cumulative_refunded_cents)
         values($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [pay.org_id,pay.id,pay.invoice_id,event.account,event.id,chargeId,refundDelta,principalRefundDelta,refundedCents]);
