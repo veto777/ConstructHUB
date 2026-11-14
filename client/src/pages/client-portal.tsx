@@ -283,7 +283,8 @@ function Dashboard({ data }: { data: any }) {
 
   const now = Date.now();
   const awaitingEstimates = estimates.filter(
-    (e: any) => !e.approvedAt && !e.declinedAt && (!e.expiresAt || new Date(e.expiresAt).getTime() > now),
+    (e: any) => !e.approvedAt && !e.declinedAt && e.status !== "cancelled" && e.status !== "expired"
+      && (!e.expiresAt || new Date(e.expiresAt).getTime() > now),
   );
   const unpaidInvoices = invoices.filter((i: any) => !i.paidAt && i.dueCents > 0);
   const actionCount = awaitingEstimates.length + unpaidInvoices.length;
