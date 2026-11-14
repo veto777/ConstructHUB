@@ -43,11 +43,11 @@ export function publicGuide(p: Playbook) {
   };
 }
 
-async function scanWatch(w: any, user: { id: number; email?: string | null; displayName?: string | null }) {
+async function scanWatch(w: any, user: { id: number; email?: string | null; displayName?: string | null }, byMonitor = false) {
   const { report, costUsd } = await scanName({ query: w.query, kind: w.kind, ownedDomains: w.owned_domains ?? [] });
   const { rows: [s] } = await pool.query(
-    `INSERT INTO rep_scans (user_id, watch_id, query, kind, name, email, report, score, cost_usd) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-    [user.id, w.id, report.query, w.kind, user.displayName ?? null, user.email ?? null, JSON.stringify(report), report.score, costUsd]);
+    `INSERT INTO rep_scans (user_id, watch_id, query, kind, name, email, report, score, cost_usd, by_monitor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+    [user.id, w.id, report.query, w.kind, user.displayName ?? null, user.email ?? null, JSON.stringify(report), report.score, costUsd, byMonitor]);
   await pool.query(`UPDATE rep_watches SET last_scan_id = $2, last_score = $3, last_checked_at = now(), updated_at = now() WHERE id = $1`, [w.id, s.id, report.score]);
   return { report, scanId: Number(s.id) };
 }
@@ -71,8 +71,9 @@ async function watchView(w: any) {
   };
 }
 
+// The account's own checks only: the weekly monitor's scans come on top (ACCOUNT_LIMITS) and are not counted.
 const scansUsed = async (userId: number) =>
-  Number((await pool.query(`SELECT count(*)::int AS n FROM rep_scans WHERE user_id = $1 AND created_at > now() - interval '30 days'`, [userId])).rows[0].n);
+  Number((await pool.query(`SELECT count(*)::int AS n FROM rep_scans WHERE user_id = $1 AND NOT by_monitor AND created_at > now() - interval '30 days'`, [userId])).rows[0].n);
 
 /** The monitor's share: up to WATCHES_PER_HOUR watches not scanned for a week, oldest first. */
 export async function checkDueWatches(): Promise<void> {
@@ -83,7 +84,7 @@ export async function checkDueWatches(): Promise<void> {
   for (const w of rows) {
     try {
       const before = w.last_scan_id ? (await pool.query(`SELECT report->'counts' AS c, score FROM rep_scans WHERE id = $1`, [w.last_scan_id])).rows[0] : null;
-      const { report } = await scanWatch(w, { id: w.user_id, email: w.email, displayName: w.display_name });
+      const { report } = await scanWatch(w, { id: w.user_id, email: w.email, displayName: w.display_name }, true);
       const worse = before && (report.counts.negativeTop10 > Number(before.c?.negativeTop10 ?? 0) || report.counts.negativeAutocomplete > Number(before.c?.negativeAutocomplete ?? 0));
       if (worse && w.email) {
         const base = "https://constructhub.us";

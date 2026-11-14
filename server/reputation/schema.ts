@@ -54,6 +54,8 @@ export const REPUTATION_DDL: readonly string[] = [
   `ALTER TABLE rep_scans ADD COLUMN IF NOT EXISTS user_id integer`,
   `ALTER TABLE rep_scans ADD COLUMN IF NOT EXISTS watch_id bigint`,
   `ALTER TABLE rep_scans ADD COLUMN IF NOT EXISTS help_requested_at timestamptz`,
+  // The weekly monitor's own scans: not counted against the account's checks a month (account.ts scansUsed).
+  `ALTER TABLE rep_scans ADD COLUMN IF NOT EXISTS by_monitor boolean NOT NULL DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS rep_scans_watch_idx ON rep_scans (watch_id, created_at DESC) WHERE watch_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS rep_watches (
      id bigserial PRIMARY KEY,
