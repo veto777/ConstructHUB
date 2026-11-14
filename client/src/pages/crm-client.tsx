@@ -623,8 +623,8 @@ export default function CrmClientPage() {
 
   // Only once the client itself has loaded: for a missing or foreign client the
   // thread would just 404 alongside it.
+  // Same key as the Inbox page's thread, so a reply on either refreshes both.
   const { data: thread } = useQuery<any>({
-    // Same key as the Inbox page's thread, so a reply on either refreshes both.
     queryKey: ["/api/crm/inbox", id],
     enabled: !!id && !!data && canManageCustomers,
     retry: false,
