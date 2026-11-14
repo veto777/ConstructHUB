@@ -44,7 +44,7 @@ import {
   crmPayments,
   crmNotificationEnabled,
 } from "@shared/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { financingLinksOf } from "./financing";
 import {
@@ -495,7 +495,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     const customerId = req.params.id;
 
     let estimates = await db
-      .select({ id: crmEstimates.id, number: crmEstimates.number, title: crmEstimates.title })
+      .select({ id: crmEstimates.id, number: crmEstimates.number, title: crmEstimates.title, approvedAt: crmEstimates.approvedAt })
       .from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.customerId, customerId)));
     let invoices = await db
@@ -526,9 +526,19 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
             ))
             .orderBy(desc(crmEstimateEvents.createdAt)).limit(200)
         : Promise.resolve([]),
-      db.select().from(crmEngagementSessions)
-        .where(eq(crmEngagementSessions.orgId, orgId))
-        .orderBy(desc(crmEngagementSessions.startedAt)).limit(500),
+      // Filtered to THIS client's documents in SQL: the newest 500 of the whole
+      // org pushed an older client's visits out of the window.
+      estIds.length || invIds.length
+        ? db.select().from(crmEngagementSessions)
+            .where(and(
+              eq(crmEngagementSessions.orgId, orgId),
+              or(
+                estIds.length ? and(eq(crmEngagementSessions.docType, "estimate"), inArray(crmEngagementSessions.docId, estIds)) : undefined,
+                invIds.length ? and(eq(crmEngagementSessions.docType, "invoice"), inArray(crmEngagementSessions.docId, invIds)) : undefined,
+              ),
+            ))
+            .orderBy(desc(crmEngagementSessions.startedAt)).limit(500)
+        : Promise.resolve([]),
       db.select().from(crmPayments)
         .where(and(eq(crmPayments.orgId, orgId), eq(crmPayments.customerId, customerId)))
         .orderBy(desc(crmPayments.createdAt)).limit(100),
