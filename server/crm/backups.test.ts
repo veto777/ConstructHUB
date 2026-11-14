@@ -125,6 +125,13 @@ describe("backup SpreadsheetML workbook", () => {
     assertWellFormedXml(xml);
   });
 
+  it("R7: drops characters XML forbids (a vertical tab from a pasted note)", () => {
+    const out = toSpreadsheetXml([{ name: "Notes", headers: ["note"], rows: [["line\u000Bone\u0000 two\u001F"]] }]);
+    expect(out).toContain("lineone two");
+    expect(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(out)).toBe(false);
+    assertWellFormedXml(out);
+  });
+
   it("has exactly three worksheets in order", () => {
     const names = [...xml.matchAll(/<Worksheet ss:Name="([^"]+)">/g)].map((m) => m[1]);
     expect(names).toEqual(["Clients", "Estimates", "Invoices"]);
