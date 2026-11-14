@@ -623,7 +623,8 @@ export default function CrmClientPage() {
   // Only once the client itself has loaded: for a missing or foreign client the
   // thread would just 404 alongside it.
   const { data: thread } = useQuery<any>({
-    queryKey: [`/api/crm/inbox/${id}`],
+    // Same key as the Inbox page's thread, so a reply on either refreshes both.
+    queryKey: ["/api/crm/inbox", id],
     enabled: !!id && !!data && canManageCustomers,
     retry: false,
   });
@@ -633,7 +634,7 @@ export default function CrmClientPage() {
     queryClient.invalidateQueries({ queryKey: [`/api/crm/invoices?customerId=${id}`] });
     queryClient.invalidateQueries({ queryKey: [`/api/crm/payments?customerId=${id}`] });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/appointments"] });
-    queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/inbox", id] });
     // Sibling surfaces the client page also writes to (staleTime is Infinity,
     // so only explicit invalidation ever refreshes them): the schedule page's
     // agenda view and the org-wide Payments page.
@@ -709,7 +710,8 @@ export default function CrmClientPage() {
       (await apiRequest("POST", `/api/crm/inbox/${id}/reply`, { body: replyBody.trim() })).json(),
     onSuccess: (r: any) => {
       setReplyBody("");
-      queryClient.invalidateQueries({ queryKey: [`/api/crm/inbox/${id}`] });
+      // The Inbox list and every cached thread (this one included).
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/inbox"] });
       // Word the toast from what actually happened: the portal post always
       // lands; the email copy only goes out when there's an address on file.
       const email: string | null = data?.customer?.email ?? null;
