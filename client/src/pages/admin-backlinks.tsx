@@ -297,10 +297,12 @@ function ReviewMode({ params, sendingOn, onClose }: { params: URLSearchParams; s
   const { toast } = useToast();
   const base = useMemo(() => { const p = new URLSearchParams(params); p.delete("offset"); p.set("limit", String(REVIEW_PAGE)); return p.toString(); }, [params]);
   // Its own key (not /api/admin/backlinks…) so a decision doesn't reshuffle the slides under the reader.
+  // Keyset on (score, id), not offset: the kept filter is live, so a decided row's slot is filled by the
+  // next source and an offset page would skip it.
   const list = useInfiniteQuery<ListPayload>({
-    queryKey: ["backlinks-review", base], initialPageParam: 0,
-    queryFn: ({ pageParam }) => getJson(`/api/admin/backlinks/sources?${base}&offset=${pageParam}`),
-    getNextPageParam: (last, all) => { const got = all.reduce((t, p) => t + p.rows.length, 0); return got < last.total && last.rows.length ? got : undefined; },
+    queryKey: ["backlinks-review", base], initialPageParam: "",
+    queryFn: ({ pageParam }) => getJson(`/api/admin/backlinks/sources?${base}${pageParam ? `&cursor=${encodeURIComponent(pageParam as string)}` : ""}`),
+    getNextPageParam: (last) => { const r = last.rows.at(-1); return last.rows.length && r ? JSON.stringify([r.score ?? null, r.id]) : undefined; },
   });
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.rows) ?? [], [list.data]);
   const total = list.data?.pages[0]?.total ?? 0;

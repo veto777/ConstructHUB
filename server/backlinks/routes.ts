@@ -35,6 +35,9 @@ const listQuery = z.object({
   view: z.enum(["kept", "rejected"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  // Keyset on (score, id) as JSON [score, id] — review mode pages a live filter,
+  // where an offset would skip the row sliding into a decided row's slot.
+  cursor: z.string().max(100).optional(),
 });
 const statusBody = z.object({
   status: z.enum(BACKLINK_ADMIN_STATUSES),
@@ -78,7 +81,16 @@ export function registerBacklinkRoutes(app: Express, getDevUser: GetUser): void 
     res.setHeader("Cache-Control", "no-store");
     const p = listQuery.safeParse(req.query);
     if (!p.success) return res.status(400).json({ message: "Unknown filter" });
-    try { res.json(await store.listSources({ ...p.data, quality: p.data.quality === "1" })); } catch (e) { failed(res, "list the sources", e); }
+    let cursor: { score: number | null; id: number } | undefined;
+    if (p.data.cursor) {
+      try {
+        const c: unknown = JSON.parse(p.data.cursor);
+        if (Array.isArray(c) && (c[0] === null || Number.isInteger(c[0])) && Number.isInteger(c[1]) && (c[0] === null || Math.abs(c[0]) <= 2_147_483_647) && (c[1] as number) > 0)
+          cursor = { score: c[0], id: c[1] };
+      } catch { /* answered below */ }
+      if (!cursor) return res.status(400).json({ message: "Unknown filter" });
+    }
+    try { res.json(await store.listSources({ ...p.data, quality: p.data.quality === "1", cursor })); } catch (e) { failed(res, "list the sources", e); }
   });
 
   app.get("/api/admin/backlinks/sources/:id", async (req, res) => {
