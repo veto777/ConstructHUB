@@ -1145,7 +1145,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       declinedAt: approve ? null : new Date(),
       signatureName: approve ? parsed.data.signatureName ?? null : null,
       updatedAt: new Date(),
-    }).where(eq(crmChangeOrders.id, co.id)).returning();
+    }).where(and(eq(crmChangeOrders.id, co.id), isNull(crmChangeOrders.approvedAt), isNull(crmChangeOrders.declinedAt))).returning();
+    // A concurrent response won the race: no second webhook, no second date shift.
+    if (!row) return res.status(409).json({ message: "Already responded to." });
     queueCrmEvent(co.orgId, approve ? "changeorder.approved" : "changeorder.declined", {
       changeOrderId: co.id, projectId: co.projectId, number: co.number, title: co.title,
       amountCents: co.amountCents, scheduleImpactDays: co.scheduleImpactDays ?? null,

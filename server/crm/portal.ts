@@ -821,7 +821,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         ? { approvedTotalCents: approval.totals.totalCents, selectedDiscounts: approval.selections }
         : {}),
       updatedAt: new Date(),
-    }).where(eq(crmEstimates.id, est.id)).returning();
+    }).where(and(eq(crmEstimates.id, est.id), isNull(crmEstimates.approvedAt), isNull(crmEstimates.declinedAt))).returning();
+    // A second response that raced this one (double tap, two signers) lost:
+    // nothing below (contract, stage, webhooks) may run twice.
+    if (!row) return res.status(409).json({ message: "This estimate has already been responded to." });
 
     await logEvent(est.orgId, est.id, approve ? "approved" : "declined", "client", req, {
       signatureName: parsed.data.signatureName, reason: parsed.data.reason,
