@@ -67,6 +67,10 @@ app.use("/api/ads", express.json({ limit: "512kb" }));
 app.use("/api/seo", express.json({ limit: "1mb" }));
 app.use("/api/gbp/content", express.json({ limit: "512kb" }));
 app.use("/api/mail-alerts", express.json({ limit: "256kb" }));
+// VPN Shield's tracking beacon is anonymous and firewall-exempt (audit 08 #1): a real page view sends a few
+// hundred bytes, so it is capped here before the 50 MB parser below can read it into memory.
+import { VPN_TRACK_BODY_LIMIT } from "./vpn-mode";
+app.use("/api/vpn-shield/track", express.json({ limit: VPN_TRACK_BODY_LIMIT }));
 app.use(
   express.json({
     limit: "50mb",
@@ -91,7 +95,7 @@ export function log(message: string, source = "express") {
 
 // The issue desk: a 500 a route answered by itself is recorded when the response finishes.
 import { watchHandledFailures, recordUnhandledError, recordProcessFailure } from "./ops/server-errors";
-import { logError, isBodyParserError } from "./ops/log";
+import { logError, unhandledErrorMessage } from "./ops/log";
 app.use(watchHandledFailures);
 
 // The request log (server/request-log.ts): method, path, status, duration, request id. Never a response body in
@@ -161,8 +165,8 @@ process.on("unhandledRejection", (reason) => {
       const status = typeof err.code === "string" && err.code.startsWith("LIMIT_") ? 413 : (err.status || err.statusCode || 500);
       // A body-parser error carries the raw request body (err.body) and quotes it in its message:
       // the journal gets its type/status/length only (ops/log.ts), the client a fixed sentence.
-      const isBodyError = isBodyParserError(err);
-      const message = isBodyError ? "The request body could not be read as JSON." : (err.message || "Internal Server Error");
+      // A 5xx answers a fixed sentence too: the detail (a Postgres message, a vendor's text) is logged below, not sent.
+      const message = unhandledErrorMessage(err, status);
 
       logError("Internal Server Error:", err);
       // The issue desk: any 5xx that reached this handler (route + method + error identity).

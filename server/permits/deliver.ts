@@ -25,7 +25,7 @@ export function watchLink(watchId: number): string {
   return `${alertsBaseUrl()}/permit-alerts?watch=${watchId}`;
 }
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const line = (p: Permit) => [p.permitNumber, p.permitType, p.address, p.contractorName ? `by ${p.contractorName}` : null, p.status, p.issuedAt ? `issued ${p.issuedAt}` : p.appliedAt ? `applied ${p.appliedAt}` : null]
   .filter(Boolean).join(" · ");
 

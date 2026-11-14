@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
+import { createSlotQueue, liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
 
 describe("live search portal outcome", () => {
   it("reports a portal as searched only when its scrape job completed", () => {
@@ -33,5 +33,36 @@ describe("live search portal outcome", () => {
     expect(scrapeFailureReason("Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://x.invalid")).toBe("the portal could not be reached");
     expect(scrapeFailureReason("x".repeat(300))).toHaveLength(140);
     expect(scrapeFailureReason(undefined)).toBe("the portal search did not finish");
+  });
+});
+
+// Audit 08 #3: every live search opened its own four browser contexts with no server-wide ceiling.
+describe("createSlotQueue", () => {
+  it("never runs more than max at once, runs everything, and keeps arrival order", async () => {
+    const q = createSlotQueue(2);
+    const started: number[] = [];
+    const release: (() => void)[] = [];
+    let peak = 0;
+    const jobs = [0, 1, 2, 3, 4].map((i) => q.run(async () => {
+      started.push(i);
+      peak = Math.max(peak, q.active);
+      await new Promise<void>((r) => release.push(r));
+      return i * 10;
+    }));
+    await Promise.resolve();
+    expect(started).toEqual([0, 1]);
+    expect(q.waiting).toBe(3);
+    for (let i = 0; i < 5; i++) { release[i](); await new Promise((r) => setTimeout(r, 0)); }
+    expect(await Promise.all(jobs)).toEqual([0, 10, 20, 30, 40]);
+    expect(started).toEqual([0, 1, 2, 3, 4]);
+    expect(peak).toBe(2);
+    expect([q.active, q.waiting]).toEqual([0, 0]);
+  });
+
+  it("frees the slot when the work fails", async () => {
+    const q = createSlotQueue(1);
+    await expect(q.run(async () => { throw new Error("portal down"); })).rejects.toThrow("portal down");
+    expect(q.active).toBe(0);
+    expect(await q.run(async () => "ok")).toBe("ok");
   });
 });

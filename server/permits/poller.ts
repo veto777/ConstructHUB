@@ -17,7 +17,7 @@
  * `permitAlertDeps` is swapped by server/permits/poller.test.ts (a fake adapter).
  */
 import { pool, db } from "../db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { permitDatabases, permitWatches, permits, permitWatchHits, type Permit, type PermitWatch } from "@shared/schema";
 import { recordFailure } from "../ops/issues";
 import { getAdapter } from "../scrapers/registry";
@@ -25,7 +25,8 @@ import type { AdapterCtx, PermitRecord, PortalAdapter } from "../scrapers/types"
 import { newBrowserContext } from "../scraper";
 import { geocodeAddress } from "./geocode";
 import { deliverDigest, type DeliveryResults } from "./deliver";
-import { contentHash, matchWatch, normalizeAddress } from "./matching";
+import { contentHash, digestUndelivered, matchWatch, normalizeAddress } from "./matching";
+import { getEntitlements, moduleEnabled } from "../entitlements";
 import type { WatchKind, WatchParams } from "@shared/permit-alerts";
 import { workerInterval } from "../workers";
 
@@ -41,6 +42,8 @@ const GEOCODES_PER_POLL = 40;
 const TICK_MS = 5 * 60 * 1000;
 const JURISDICTIONS_PER_TICK = 10;
 const LOCK_KEY = 7193;
+/** How long a digest that reached nobody is sent again with later polls. */
+const UNSENT_RETRY_MS = 24 * 60 * 60 * 1000;
 
 export const permitAlertDeps = {
   getAdapter: (platform: string | null | undefined): PortalAdapter | null => getAdapter(platform),
@@ -48,7 +51,16 @@ export const permitAlertDeps = {
   geocode: (address: string, hint?: string | null) => geocodeAddress(address, hint),
   deliver: (watch: PermitWatch, found: Permit[]): Promise<DeliveryResults> => deliverDigest(watch, found),
   now: () => new Date(),
+  /** Whether the account's plan includes Permit Alerts right now: the same test as the routes' requireModule gate. */
+  entitled: async (userId: number): Promise<boolean> => moduleEnabled(await getEntitlements(userId), "permitAlerts"),
 };
+
+/** The accounts among `userIds` whose plan includes Permit Alerts (one lookup per account). */
+async function entitledUsers(userIds: number[]): Promise<Set<number>> {
+  const out = new Set<number>();
+  for (const id of new Set(userIds)) if (await permitAlertDeps.entitled(id)) out.add(id);
+  return out;
+}
 
 export type PollOutcome =
   | { status: "polled"; databaseId: number; found: number; newOrChanged: number; hits: number }
@@ -111,11 +123,15 @@ export async function watchesForDatabase(databaseId: number): Promise<PermitWatc
 
 /** Match the given permits against the watches, record new hits, deliver one digest per watch. */
 export async function matchAndNotify(watches: PermitWatch[], permitIds: number[], now: Date): Promise<number> {
-  if (!watches.length || !permitIds.length) return 0;
+  // An account that no longer has the Permit Alerts module keeps its watches but is not matched or notified: the
+  // routes answer 402 for it, so it could not even switch them off (audit 08 #5). They resume with the plan.
+  const entitled = await entitledUsers(watches.map((w) => w.userId));
+  watches = watches.filter((w) => entitled.has(w.userId));
+  if (!watches.length) return 0;
   let hits = 0;
   // Geocode permits once when any watch on this jurisdiction wants a radius; capped per poll (each call is paid).
   const wantsRadius = watches.some((w) => w.kind === "trade_area" && (w.params as WatchParams).radiusMiles && typeof (w.params as WatchParams).lat === "number");
-  if (wantsRadius) {
+  if (wantsRadius && permitIds.length) {
     const rows = await db.select().from(permits).where(and(inArray(permits.id, permitIds), sql`lat IS NULL AND address IS NOT NULL`)).limit(GEOCODES_PER_POLL);
     for (const p of rows) {
       const g = await permitAlertDeps.geocode(p.address!, p.jurisdiction);
@@ -123,7 +139,7 @@ export async function matchAndNotify(watches: PermitWatch[], permitIds: number[]
     }
   }
   for (const watch of watches) {
-    const candidates = await db.select().from(permits).where(and(
+    const candidates = !permitIds.length ? [] : await db.select().from(permits).where(and(
       inArray(permits.id, permitIds),
       sql`NOT EXISTS (SELECT 1 FROM permit_watch_hits h WHERE h.watch_id = ${watch.id} AND h.permit_id = ${permits.id})`,
     ));
@@ -133,20 +149,28 @@ export async function matchAndNotify(watches: PermitWatch[], permitIds: number[]
       if (m.matched) matched.push({ permit: p, reason: m.reason });
     }
     await db.update(permitWatches).set({ lastCheckedAt: now }).where(eq(permitWatches.id, watch.id));
-    if (!matched.length) continue;
+    // Hits from the last day whose digest reached nobody (every channel failed, or the process stopped between
+    // recording and sending) go out again with this poll: the hit row alone would keep them from ever matching again.
+    const unsent = await db.select({ id: permitWatchHits.id, permitId: permitWatchHits.permitId }).from(permitWatchHits).where(and(
+      eq(permitWatchHits.watchId, watch.id), isNull(permitWatchHits.notifiedAt),
+      gt(permitWatchHits.matchedAt, new Date(now.getTime() - UNSENT_RETRY_MS)),
+    ));
     // ON CONFLICT DO NOTHING: another process that got here first owns the digest for those permits.
-    const inserted = await db.insert(permitWatchHits)
+    const inserted = !matched.length ? [] : await db.insert(permitWatchHits)
       .values(matched.map((m) => ({ watchId: watch.id, permitId: m.permit.id, reason: m.reason, matchedAt: now })))
       .onConflictDoNothing().returning({ id: permitWatchHits.id, permitId: permitWatchHits.permitId });
-    if (!inserted.length) continue;
     hits += inserted.length;
-    const toSend = inserted.map((h) => matched.find((m) => m.permit.id === h.permitId)!.permit);
+    const pending = [...unsent, ...inserted];
+    if (!pending.length) continue;
+    const unsentPermits = unsent.length ? await db.select().from(permits).where(inArray(permits.id, unsent.map((h) => h.permitId))) : [];
+    const toSend = [...unsentPermits, ...inserted.map((h) => matched.find((m) => m.permit.id === h.permitId)!.permit)];
     let results: DeliveryResults = {};
     try { results = await permitAlertDeps.deliver(watch, toSend); }
     catch (e: any) { results = { email: { ok: false, detail: String(e?.message ?? e).slice(0, 200) } }; }
-    await db.update(permitWatchHits).set({ notifiedAt: new Date(), channelResults: results })
-      .where(inArray(permitWatchHits.id, inserted.map((h) => h.id)));
-    await db.update(permitWatches).set({ lastMatchedAt: now }).where(eq(permitWatches.id, watch.id));
+    // Notified only when the digest went out on a channel; otherwise the hits stay un-notified for the retry above.
+    await db.update(permitWatchHits).set({ notifiedAt: digestUndelivered(results) ? null : new Date(), channelResults: results })
+      .where(inArray(permitWatchHits.id, pending.map((h) => h.id)));
+    if (inserted.length) await db.update(permitWatches).set({ lastMatchedAt: now }).where(eq(permitWatches.id, watch.id));
   }
   return hits;
 }
@@ -222,11 +246,15 @@ export async function pollJurisdiction(databaseId: number): Promise<PollOutcome>
 
 /** Jurisdictions an active watch names whose poll is due, oldest first. */
 export async function dueJurisdictions(limit = JURISDICTIONS_PER_TICK): Promise<number[]> {
+  // Only watches of accounts whose plan still includes Permit Alerts keep a portal on the schedule (audit 08 #5).
+  const { rows: owners } = await pool.query<{ user_id: number }>("SELECT DISTINCT user_id FROM permit_watches WHERE active");
+  const entitled = [...await entitledUsers(owners.map((o) => o.user_id))];
+  if (!entitled.length) return [];
   const { rows } = await pool.query<{ database_id: number }>(
-    `SELECT w.database_id FROM (SELECT DISTINCT unnest(database_ids) AS database_id FROM permit_watches WHERE active) w
+    `SELECT w.database_id FROM (SELECT DISTINCT unnest(database_ids) AS database_id FROM permit_watches WHERE active AND user_id = ANY($2::int[])) w
      LEFT JOIN permit_poll_state s ON s.database_id = w.database_id
      WHERE s.database_id IS NULL OR s.next_poll_at <= now()
-     ORDER BY s.next_poll_at NULLS FIRST, w.database_id LIMIT $1`, [limit]);
+     ORDER BY s.next_poll_at NULLS FIRST, w.database_id LIMIT $1`, [limit, entitled]);
   return rows.map((r) => r.database_id);
 }
 
@@ -245,7 +273,8 @@ export async function requestPollSoon(databaseIds: number[]): Promise<void> {
   if (!databaseIds.length) return;
   await pool.query(
     `INSERT INTO permit_poll_state(database_id, next_poll_at) SELECT unnest($1::int[]), now()
-     ON CONFLICT (database_id) DO UPDATE SET next_poll_at = now()`, [databaseIds]);
+     ON CONFLICT (database_id) DO UPDATE SET next_poll_at = now()
+       WHERE permit_poll_state.failing_since IS NULL OR permit_poll_state.next_poll_at <= now() + interval '1 hour'`, [databaseIds]);
 }
 
 /** One scheduler pass; only one instance at a time across processes. */

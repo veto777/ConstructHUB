@@ -28,3 +28,30 @@ export function liveSearchOutcome(
     message: resultCount > 0 ? `Stopped after ${resultCount} results: ${reason}` : `Not searched: ${reason}`,
   };
 }
+
+/**
+ * A first-come, first-served set of slots. Live permit searches share one (server/scraper.ts): each search still
+ * runs up to four portals at once, but all searches together never hold more than `max` browser contexts, so a burst
+ * of searches waits its turn instead of opening hundreds of contexts in the one shared browser (audit 08 #3).
+ * Nothing is refused: `run` waits for a free slot, runs the work and frees the slot whatever the outcome.
+ */
+export function createSlotQueue(max: number) {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  return {
+    async run<T>(work: () => Promise<T>): Promise<T> {
+      // A freed slot is handed straight to the next waiter (active stays counted), so the order is kept.
+      if (active >= max) await new Promise<void>((resolve) => waiting.push(resolve));
+      else active++;
+      try {
+        return await work();
+      } finally {
+        const next = waiting.shift();
+        if (next) next();
+        else active--;
+      }
+    },
+    get active() { return active; },
+    get waiting() { return waiting.length; },
+  };
+}
