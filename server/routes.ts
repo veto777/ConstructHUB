@@ -53,7 +53,7 @@ import { platformAccessGate, requirePlatformAccess } from "./platform-access";
 import { registerTrackingRoutes } from "./tracking-script";
 import { registerAdsConsultantRoutes } from "./ads-consultant";
 import { registerHubRoutes } from "./hub";
-import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
+import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, isGoogleMapsPageUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { registerPublicFileRoutes } from "./files/public-files";
@@ -1574,7 +1574,7 @@ export async function registerRoutes(
           try {
             scraped = await scrapeGoogleMapsBusiness({
               name: synthName,
-              mapsUrl: /google\.\w+\/maps/i.test(photoEffectiveUrl) ? photoEffectiveUrl : null,
+              mapsUrl: isGoogleMapsPageUrl(photoEffectiveUrl) ? photoEffectiveUrl : null,
               kgmid: kgmid || extractMapsDataKgmid(photoEffectiveUrl),
             });
           } catch {}
