@@ -155,11 +155,12 @@ export async function emitCrmEvent(orgId: string, event: string, payload: any): 
         }
         if (attempt < 2) await new Promise((r) => setTimeout(r, 500 * Math.pow(3, attempt)));
       }
+      const failures = lastStatus >= 200 && lastStatus < 300 ? 0 : (h.failureCount ?? 0) + 1;
       await db.update(crmWebhooks).set({
         lastStatus, lastAttemptAt: new Date(),
-        failureCount: lastStatus >= 200 && lastStatus < 300 ? 0 : (h.failureCount ?? 0) + 1,
+        failureCount: failures,
         // Auto-disable after sustained failure so we stop hammering dead URLs.
-        active: (h.failureCount ?? 0) + 1 < 20,
+        active: failures < 20,
       }).where(eq(crmWebhooks.id, h.id)).catch(() => {});
     }));
   } catch (e: any) {
