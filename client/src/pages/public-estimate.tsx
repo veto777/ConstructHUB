@@ -155,7 +155,8 @@ function PayCard({ token, company, estimate, payInfo }: {
     );
   }
 
-  if (returned === "1") {
+  // estimate.paymentProcessing: the server saw a bank transfer still clearing (a reopened link has no ?paid=1).
+  if (returned === "1" || estimate.paymentProcessing) {
     return (
       <Card className="border-primary/50 bg-primary/5">
         <CardContent className="p-5 flex items-start gap-3">

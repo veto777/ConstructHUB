@@ -104,7 +104,9 @@ export default function PublicInvoicePage() {
   // checkout finished — an ACH debit can still be settling, and the parameter
   // itself is trivially forgeable, so it must never render as "Paid".
   const settled = Boolean(inv.paidAt);
-  const processing = !settled && new URLSearchParams(window.location.search).get("paid") === "1";
+  // The server also reports a bank transfer that is still clearing (processingCents): a reopened email link has
+  // no ?paid=1, and offering Pay again there would take the same balance twice.
+  const processing = !settled && (Number(inv.processingCents ?? 0) > 0 || new URLSearchParams(window.location.search).get("paid") === "1");
   // Only a LOADED pay-info can say no rail is offered; while it loads (or if
   // it fails) the plain Pay button stays and the server answers honestly.
   const noOnlineRail = Boolean(payInfo) && !payInfo.cardAvailable && !payInfo.achAvailable;

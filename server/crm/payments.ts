@@ -40,14 +40,19 @@ import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
 import { reconcileSettingsOf, receiptSettingsOf, parseDayList, offlinePaymentInstructionsOf, offlinePaymentInstructionsFor } from "@shared/payment-settings";
 import { resolveEstimateDivision, resolveInvoiceDivision } from "./divisions";
-import { paymentWriteLimit, paymentSettingsLimit, publicPayLimit } from "./payment-guard";
+import { paymentWriteLimit, paymentSettingsLimit, publicPayLimit, OPEN_SESSION_WINDOW_MIN, checkoutExpiresAt } from "./payment-guard";
+import { clearingCents } from "./payment-reconcile";
 import { uploadToR2, getR2Url } from "../r2";
 import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
 
 type GetUser = (req: any, res: any) => any;
 
-/** A checkout session stays open for a while; don't stack a second one on top. */
-const OPEN_SESSION_WINDOW_MIN = 30;
+// A checkout session stays open for a while (payment-guard.ts CHECKOUT_SESSION_LIFETIME_MIN, set as its
+// expires_at); don't stack a second one on top. OPEN_SESSION_WINDOW_MIN outlasts that lifetime.
+
+/** Said by every pay / payment-link route while a bank transfer for the document is still clearing. */
+const CLEARING_MESSAGE = (doc: "invoice" | "estimate") =>
+  `A bank transfer for this ${doc} is still clearing. It can take a few business days to settle, and there is nothing more to pay until it does.`;
 
 async function hasOpenSession(where: any): Promise<boolean> {
   // Compare against the DATABASE clock, not a JS Date: these columns are
@@ -529,6 +534,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     try {
       const session = await stripe.checkout.sessions.create({
         mode: "payment", payment_method_types: methods,
+        expires_at: checkoutExpiresAt(), // never payable after the open-session guard stops watching it
         customer_email: customer?.email ?? undefined,
         line_items: lineItems,
         success_url: `${base}${opts.successPath}?paid=1`,
@@ -570,10 +576,12 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (inv.voidedAt) return res.status(409).json({ message: "This invoice has been voided." });
     const amount = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
     if (amount < 50) return res.status(400).json({ message: "Nothing left to pay on this invoice." });
+    // A bank transfer that is still clearing is not on paidCents yet: never take the same balance twice.
+    if ((await clearingCents({ invoiceId: inv.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("invoice") });
     // Same double-pay guard as the public flow: one open session at a time.
     if (await hasOpenSession(eq(crmPayments.invoiceId, inv.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this invoice. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this invoice. Finish it (or wait about half an hour) before starting another.",
       });
     }
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
@@ -616,9 +624,10 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
       .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
     if (settled.length) return res.status(409).json({ message: "This estimate has already been paid." });
+    if ((await clearingCents({ estimateId: est.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("estimate") });
     if (await hasOpenSession(eq(crmPayments.estimateId, est.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this estimate. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this estimate. Finish it (or wait about half an hour) before starting another.",
       });
     }
     const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
@@ -855,10 +864,12 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (amount < 50) return res.status(400).json({ message: "Nothing left to pay." });
     // Double-pay guard: one open checkout session at a time per invoice. The
     // webhook hasn't landed yet while a session is open, so paidCents alone
-    // can't stop a client from paying twice in two tabs.
+    // can't stop a client from paying twice in two tabs. Nor can it while a
+    // bank transfer is clearing: that money is not on paidCents until it settles.
+    if ((await clearingCents({ invoiceId: inv.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("invoice") });
     if (await hasOpenSession(eq(crmPayments.invoiceId, inv.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this invoice. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this invoice. Finish it (or wait about half an hour) before starting another.",
       });
     }
 
@@ -898,6 +909,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     try {
       const session = await stripe.checkout.sessions.create({
         mode: "payment", payment_method_types: methods,
+        expires_at: checkoutExpiresAt(), // never payable after the open-session guard stops watching it
         customer_email: cust?.email ?? undefined,
         line_items: lineItems,
         success_url: `${base}/i/${t}?paid=1`,
@@ -942,9 +954,10 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (settled.length) {
       return res.status(409).json({ message: "This estimate has already been paid." });
     }
+    if ((await clearingCents({ estimateId: est.id })) > 0) return res.status(409).json({ message: CLEARING_MESSAGE("estimate") });
     if (await hasOpenSession(eq(crmPayments.estimateId, est.id))) {
       return res.status(409).json({
-        message: "A checkout session is already open for this estimate. Finish it (or wait 30 minutes) before starting another.",
+        message: "A checkout session is already open for this estimate. Finish it (or wait about half an hour) before starting another.",
       });
     }
 
@@ -990,6 +1003,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         payment_method_types: methods,
+        expires_at: checkoutExpiresAt(), // never payable after the open-session guard stops watching it
         customer_email: cust?.email ?? undefined,
         line_items: lineItems,
         success_url: `${base}/e/${t}?paid=1`,

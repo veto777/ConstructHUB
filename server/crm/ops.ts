@@ -33,7 +33,7 @@ import { requireCrmFeature, emitCrmEvent, queueCrmEvent, webhookUrlIsSafe } from
 import { invoiceDefaultsFromOrg } from "./doc-defaults";
 import { autoSendPaymentReceipt } from "./receipts";
 import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent } from "./payment-guard";
-import { completeReconcileTasks } from "./payment-reconcile";
+import { completeReconcileTasks, clearingCents } from "./payment-reconcile";
 import { receiptSettingsOf, reconcileSettingsOf, MANUAL_PAYMENT_METHOD_VALUES } from "@shared/payment-settings";
 import { logActivity } from "./activity";
 import { loadActorDirectory } from "./actors";
@@ -511,6 +511,19 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
 
       const outstanding = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
       if (outstanding <= 0) return { error: { status: 409, message: "This invoice is already paid in full." } };
+      // A bank transfer still clearing is not on paidCents yet, but it is money on its way: recording the same
+      // balance again by hand would leave the invoice paid twice when the transfer settles.
+      const clearing = await clearingCents({ invoiceId: inv.id }, tx);
+      if (clearing > 0 && parsed.data.amountCents > outstanding - clearing) {
+        const room = Math.max(0, outstanding - clearing);
+        return { error: {
+          status: 409,
+          message: room > 0
+            ? `A ${usd(clearing)} bank transfer for this invoice is still clearing, so only ${usd(room)} more can be recorded until it settles.`
+            : `A ${usd(clearing)} bank transfer for this invoice is still clearing. It can take a few business days to settle, and nothing more can be recorded until it does.`,
+          outstandingCents: room,
+        } };
+      }
       if (parsed.data.amountCents > outstanding) {
         return { error: {
           status: 400,

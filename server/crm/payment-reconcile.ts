@@ -45,7 +45,7 @@ import { logActivity } from "./activity";
 import { workerInterval } from "../workers";
 import { emitCrmEvent } from "./integrations";
 import { autoSendDepositReceipt } from "./receipts";
-import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent } from "./payment-guard";
+import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent, OPEN_SESSION_WINDOW_MIN, CLEARING_WINDOW_DAYS } from "./payment-guard";
 
 type GetUser = (req: any, res: any) => any;
 type Project = typeof crmProjects.$inferSelect;
@@ -77,7 +77,6 @@ export type ReconcileMeta = {
 };
 
 const DAY_MS = 24 * 3600_000;
-const OPEN_SESSION_WINDOW_MIN = 30;
 const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const whatOf = (kind: ReconcileKind) => (kind === "deposit" ? "deposit" : "final payment");
 
@@ -126,6 +125,22 @@ export async function collectedCents(orgId: string, where: { estimateId?: string
     sql`(${sql.join(ors, sql` or `)})`,
   ));
   return rows[0]?.net ?? 0;
+}
+
+/**
+ * Money in a bank transfer that finished checkout but has not settled or failed yet (status "processing") on an
+ * estimate or an invoice. It is not on any balance until it settles, so every "what is left to pay" check has to
+ * count it separately or the same balance can be paid twice.
+ */
+export async function clearingCents(where: { estimateId?: string | null; invoiceId?: string | null }, tx: any = db): Promise<number> {
+  const target = where.invoiceId ? eq(crmPayments.invoiceId, where.invoiceId)
+    : where.estimateId ? eq(crmPayments.estimateId, where.estimateId) : null;
+  if (!target) return 0;
+  const rows: { cents: number }[] = await tx.select({
+    cents: sql<number>`coalesce(sum(${crmPayments.amountCents}), 0)::int`,
+  }).from(crmPayments).where(and(target, eq(crmPayments.status, "processing"),
+    sql`${crmPayments.createdAt} >= now() - make_interval(days => ${CLEARING_WINDOW_DAYS})`));
+  return rows[0]?.cents ?? 0;
 }
 
 /** A Checkout session the client may still finish (the same window payments.ts uses). */
@@ -525,13 +540,19 @@ export function registerCrmReconcileRoutes(app: Express, getDevUser: GetUser): v
         .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.estimateId, est.id), isNull(crmInvoices.voidedAt))).limit(1);
       if (invoiced) return { error: { status: 409, message: `This estimate is already invoiced as ${invoiced.number ?? "an invoice"} — record the payment on that invoice instead.` } };
       if (await openSessionOnEstimate(ctx.org.id, est.id, tx)) {
-        return { error: { status: 409, message: "The client has a payment link open for this estimate right now. Wait for it to finish (or 30 minutes) before recording the deposit by hand." } };
+        return { error: { status: 409, message: "The client has a payment link open for this estimate right now. Wait for it to finish (or about half an hour) before recording the deposit by hand." } };
       }
+      // A bank transfer still clearing is money on its way: it takes up room like collected money does.
+      const clearing = await clearingCents({ estimateId: est.id }, tx);
       const signedTotal = amountDueCents({ ...est, depositCents: null } as any) ?? 0;
       const already = await collectedCents(ctx.org.id, { estimateId: est.id }, tx);
-      const room = Math.max(0, signedTotal - already);
-      if (room <= 0) return { error: { status: 409, message: "This estimate is already paid in full." } };
-      if (parsed.data.amountCents > room) return { error: { status: 400, message: `Only ${money(room)} is left to collect on this estimate.`, outstandingCents: room } };
+      const room = Math.max(0, signedTotal - already - clearing);
+      if (room <= 0) return { error: { status: 409, message: clearing > 0
+        ? `A ${money(clearing)} bank transfer for this estimate is still clearing, so nothing more is left to collect. It can take a few business days to settle.`
+        : "This estimate is already paid in full." } };
+      if (parsed.data.amountCents > room) return { error: { status: 400, message: clearing > 0
+        ? `Only ${money(room)} is left to collect on this estimate. A ${money(clearing)} bank transfer is still clearing.`
+        : `Only ${money(room)} is left to collect on this estimate.`, outstandingCents: room } };
       const [pay] = await tx.insert(crmPayments).values({
         orgId: ctx.org.id, customerId: est.customerId, estimateId: est.id, invoiceId: null,
         projectId: est.projectId ?? null, provider: "manual",
