@@ -37,6 +37,18 @@ describe("ranking-grid credits on the client", () => {
     expect(page).toContain("creditsLabel(gridCreditCost(n))");
     expect(page).not.toMatch(/label: "\d+×\d+ \(\d+ points\)"/);
   });
+
+  // Audit M1: the scan stores row 0 as its southern edge; the map and the thumbnail are north up.
+  it("draws the stored rows north up, on the map and on the thumbnail alike", () => {
+    const routes = read("server/routes.ts");
+    expect(routes).toContain("const ptLat = centerLat + (offsetRow * distanceMiles * milesToDeg);");
+    const page = read("client/src/pages/ranking-grid.tsx");
+    expect(page).toContain("return size - 1 - gridRow;");
+    expect(page).toContain("displayRow(scan.gridSize, res.gridRow) === r");
+    expect(page).toContain("out[displayRow(size, r.gridRow)]");
+    expect(page).not.toMatch(/gridRow === r\b/);
+    expect(page).not.toContain("out[r.gridRow]");
+  });
 });
 
 describe("usage meters", () => {

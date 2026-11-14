@@ -143,10 +143,22 @@ function HeatThumb({ size, ranks, px = 72, className = "", testId }: {
   );
 }
 
-/** A scan's results as rows of ranks, for HeatThumb. */
-function ranksOf(size: number, results: RankingGridResult[]): (number | null | undefined)[][] {
+/**
+ * The row a stored grid point is drawn on. The scan stores gridRow 0 as its SOUTHERN edge (lat = centre +
+ * (row - half) x spacing, server/routes.ts runRankingGridScan) while the map and the thumbnail are drawn north
+ * up, top row first. So the stored rows are flipped for drawing: the northern row goes on top.
+ */
+function displayRow(size: number, gridRow: number): number {
+  return size - 1 - gridRow;
+}
+
+/** A scan's results as rows of ranks (north on top), for HeatThumb. */
+function ranksOf(size: number, results: Pick<RankingGridResult, "gridRow" | "gridCol" | "rank">[]): (number | null | undefined)[][] {
   const out: (number | null | undefined)[][] = Array.from({ length: size }, () => Array<number | null | undefined>(size).fill(undefined));
-  for (const r of results) if (out[r.gridRow] && r.gridCol < size) out[r.gridRow][r.gridCol] = r.rank;
+  for (const r of results) {
+    const row = out[displayRow(size, r.gridRow)];
+    if (row && r.gridCol < size) row[r.gridCol] = r.rank;
+  }
   return out;
 }
 
@@ -227,7 +239,7 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
   for (let r = 0; r < scan.gridSize; r++) {
     grid[r] = [];
     for (let c = 0; c < scan.gridSize; c++) {
-      grid[r][c] = results.find(res => res.gridRow === r && res.gridCol === c) || null;
+      grid[r][c] = results.find(res => displayRow(scan.gridSize, res.gridRow) === r && res.gridCol === c) || null;
     }
   }
 
