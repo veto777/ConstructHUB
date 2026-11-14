@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import {
   parseCsv, guessMapping, applyMapping, validateRecord,
-  parseMoneyToCents, mapEstimateStatus, mapInvoiceStatus,
+  parseMoneyToCents, mapEstimateStatus, mapInvoiceStatus, dedupePhoneDigits,
 } from "./migrate-lib";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
@@ -163,6 +163,32 @@ describe("applyMapping + validateRecord", () => {
 
   it("flags an estimate with no customer reference", () => {
     expect(validateRecord("estimates", { total: "100" }).join()).toMatch(/no customer/);
+  });
+});
+
+describe("audit fixes: blank headers and placeholder phones", () => {
+  it("E4: a blank header cell is named and a repeated header is suffixed", () => {
+    const { headers, rows } = parseCsv("Name,Email,,Email\nJane,j@x.com,,j2@x.com\n");
+    expect(headers).toEqual(["Name", "Email", "Column 3", "Email (2)"]);
+    expect(rows[0]).toEqual(["Jane", "j@x.com", "", "j2@x.com"]);
+  });
+
+  it("E8: an unnamed column does not block a unique prefix match", () => {
+    const { headers } = parseCsv("Name,Email Address (Primary),\nJane,j@x.com,\n");
+    expect(guessMapping("customers", headers).email).toBe("Email Address (Primary)");
+  });
+
+  it("E8: the two-letter State alias never claims Status or Start Date", () => {
+    expect(guessMapping("customers", ["Name", "Status"]).state).toBeNull();
+    expect(guessMapping("customers", ["Name", "Start Date"]).state).toBeNull();
+    expect(guessMapping("customers", ["Name", "ST"]).state).toBe("ST");
+    expect(guessMapping("customers", ["Name", "State/Province"]).state).toBe("State/Province");
+  });
+
+  it("E1: a phone with no real number is never a dedupe key", () => {
+    for (const p of ["N/A", "-", "none", "call office", "", null, undefined, "ext 9"]) expect(dedupePhoneDigits(p)).toBeNull();
+    expect(dedupePhoneDigits("(503) 555-1212")).toBe("5035551212");
+    expect(dedupePhoneDigits("555-1234")).toBe("5551234");
   });
 });
 
