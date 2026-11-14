@@ -304,10 +304,10 @@ export async function listSources(f: ListFilter): Promise<{ rows: BacklinkSource
   if (f.quality) where.push(QUALITY_SQL);
   if (f.q) where.push(`domain ILIKE ${p(`%${f.q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`)}`);
   if (f.cursor) {
-    // (score DESC NULLS LAST, id DESC) after the cursor row; NULL-score rows only
-    // pair with a NULL-score cursor.
+    // (score DESC NULLS LAST, id DESC) after the cursor row: every unscored row comes after any scored
+    // cursor; among unscored rows the id decides.
     const s = p(f.cursor.score), i = p(f.cursor.id);
-    where.push(`((score < ${s} OR (score = ${s} AND id < ${i})) OR (${s}::int IS NULL AND score IS NULL AND id < ${i}))`);
+    where.push(`((score < ${s} OR (score = ${s} AND id < ${i})) OR (${s}::int IS NOT NULL AND score IS NULL) OR (${s}::int IS NULL AND score IS NULL AND id < ${i}))`);
   }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const total = Number((await db().query(`SELECT count(*)::int n FROM backlink_sources ${w}`, v)).rows[0]?.n ?? 0);
