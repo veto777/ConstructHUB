@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import type { Express, Request, Response } from "express";
 import { db, pool } from "./db";
 import { subscriptions, masterClassModules } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
 import { appReturnBaseUrl } from "./site-context";
 import { registerResearchRoutes, fulfilResearchCheckout } from "./research/routes";
@@ -105,7 +105,7 @@ async function subscriptionRowFor(userId: number): Promise<SubscriptionRow | und
   return row;
 }
 
-async function getOrCreateCustomer(userId: number, email: string, existing?: SubscriptionRow | null) {
+export async function getOrCreateCustomer(userId: number, email: string, existing?: SubscriptionRow | null) {
   if (existing === undefined) existing = await subscriptionRowFor(userId);
 
   if (existing?.stripeCustomerId) {
@@ -114,18 +114,26 @@ async function getOrCreateCustomer(userId: number, email: string, existing?: Sub
 
   const customer = await stripe.customers.create({ email, metadata: { userId: String(userId) } });
 
-  if (existing) {
-    await db.update(subscriptions).set({ stripeCustomerId: customer.id }).where(eq(subscriptions.id, existing.id));
-  } else {
-    await db.insert(subscriptions).values({
-      userId,
-      stripeCustomerId: customer.id,
-      plan: "free",
-      status: "inactive",
-    });
-  }
-
-  return customer.id;
+  // Stripe is called before the short database lock. Callers may already
+  // hold the billing lock, so this lock must never wait on a provider call.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(7170, $1)", [userId]);
+    const { rows: [tracked] } = await client.query(
+      "SELECT id, stripe_customer_id FROM subscriptions WHERE user_id=$1 ORDER BY stripe_customer_id NULLS LAST, id LIMIT 1", [userId]);
+    const customerId = tracked?.stripe_customer_id ?? customer.id;
+    if (!tracked) {
+      await client.query("INSERT INTO subscriptions(user_id,stripe_customer_id,plan,status) VALUES($1,$2,'free','inactive')", [userId,customerId]);
+    } else if (!tracked.stripe_customer_id) {
+      await client.query("UPDATE subscriptions SET stripe_customer_id=$2 WHERE id=$1", [tracked.id,customerId]);
+    }
+    await client.query("COMMIT");
+    return customerId;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 }
 
 const orderMetadata = (userId: number, order: PlanOrder) => ({
@@ -174,10 +182,11 @@ async function liveSubscription(userId: number) {
  * the ONE path every Stripe subscription write takes, so a trial code or an
  * admin grant never gets either). `userId` is the account the row belongs to.
  */
-async function writeSubscriptionRow(where: { id: number } | { userId: number }, userId: number, sub: Stripe.Subscription, fallbackPlan?: string | null) {
+async function writeSubscriptionRow(where: { id: number } | { userId: number } | { subscriptionId: string }, userId: number, sub: Stripe.Subscription, fallbackPlan?: string | null) {
   const set = subscriptionRowUpdate(sub, fallbackPlan);
   await db.update(subscriptions).set(set)
-    .where("id" in where ? eq(subscriptions.id, where.id) : eq(subscriptions.userId, where.userId));
+    .where("id" in where ? eq(subscriptions.id, where.id) : "userId" in where ? eq(subscriptions.userId, where.userId)
+      : eq(subscriptions.stripeSubscriptionId, where.subscriptionId));
   await recordCancellation(where, sub);
   await notePricingTerms(userId, set, subscriptionStartOf(sub));
   return set;
@@ -862,7 +871,7 @@ export function registerStripeRoutes(app: Express) {
               // this should not happen; if it does, both bill — say so loudly.
               console.error(`[billing] user ${userId} now has two live subscriptions (${tracked.stripeSubscriptionId} and ${stripeSubscription.id}); tracking the new one — cancel the other in Stripe.`);
             }
-            const set = await writeSubscriptionRow({ userId }, userId, stripeSubscription, session.metadata?.plan);
+            const set = await writeSubscriptionRow(tracked ? { id: tracked.id } : { userId }, userId, stripeSubscription, session.metadata?.plan);
             await noteIntrosUsed(userId, set);
             emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
             // A returning customer's scheduled number release is cancelled when the add-on is back.
@@ -979,11 +988,15 @@ export function registerStripeRoutes(app: Express) {
           }
           await billingSchemaReady();
 
-          const [existingSub] = await db
+          let [existingSub] = await db
             .select()
             .from(subscriptions)
-            .where(eq(subscriptions.stripeCustomerId, customerId))
+            .where(eq(subscriptions.stripeSubscriptionId, payload.id))
             .limit(1);
+          if (!existingSub) {
+            [existingSub] = await db.select().from(subscriptions)
+              .where(and(eq(subscriptions.stripeCustomerId, customerId), isNull(subscriptions.stripeSubscriptionId))).limit(1);
+          }
 
           // Stripe does not deliver events in order (and a failed handler is
           // retried later), so the row takes the subscription as Stripe has it
@@ -997,7 +1010,7 @@ export function registerStripeRoutes(app: Express) {
             // What we had before this event, for "set to end" / "resumed"
             // when Stripe's previous_attributes don't say.
             const stored = existingSub.stripeSubscriptionId === sub.id ? await cancellationFor(existingSub.id) : null;
-            const set = await writeSubscriptionRow({ id: existingSub.id }, existingSub.userId, sub);
+            const set = await writeSubscriptionRow(existingSub.stripeSubscriptionId ? { subscriptionId: sub.id } : { id: existingSub.id }, existingSub.userId, sub);
             await noteIntrosUsed(existingSub.userId, set);
             if (event.type === "customer.subscription.updated") {
               // previous_attributes describe this event's snapshot, so the change is read from it.
@@ -1045,15 +1058,15 @@ export function registerStripeRoutes(app: Express) {
           const [existingSub] = await db
             .select()
             .from(subscriptions)
-            .where(eq(subscriptions.stripeCustomerId, customerId))
+            .where(eq(subscriptions.stripeSubscriptionId, sub.id))
             .limit(1);
           if (existingSub?.stripeSubscriptionId === sub.id) {
             eventUserId = existingSub.userId;
             await db
               .update(subscriptions)
               .set(canceledRowUpdate())
-              .where(eq(subscriptions.id, existingSub.id));
-            await recordCancellation({ id: existingSub.id }, null);
+              .where(eq(subscriptions.stripeSubscriptionId, sub.id));
+            await recordCancellation({ subscriptionId: sub.id }, null);
             emitSubscriptionCanceled(existingSub.userId, sub, existingSub.plan);
             // Cancelled: the Call Assistant numbers are released (now, or once SignalWire's minimum days pass).
             await afterSubscriptionChange(existingSub.userId);

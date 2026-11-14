@@ -153,10 +153,10 @@ export function cancellationOf(sub: Stripe.Subscription): Cancellation {
  * (cancel_at_period_end / cancel_at are plain-SQL columns, see ./schema).
  * `sub` null = the tracked subscription ended: nothing left to cancel.
  */
-export async function recordCancellation(where: { id: number } | { userId: number }, sub: Stripe.Subscription | null): Promise<void> {
+export async function recordCancellation(where: { id: number } | { userId: number } | { subscriptionId: string }, sub: Stripe.Subscription | null): Promise<void> {
   await billingSchemaReady();
   const c: Cancellation = sub ? cancellationOf(sub) : { cancelAtPeriodEnd: null, cancelAt: null };
-  const [column, value] = "id" in where ? ["id", where.id] : ["user_id", where.userId];
+  const [column, value] = "id" in where ? ["id", where.id] : "userId" in where ? ["user_id", where.userId] : ["stripe_subscription_id", where.subscriptionId];
   // The start date is written from the live subscription and kept when the subscription ended (sub null).
   const { rows } = await pool.query(
     `UPDATE subscriptions SET cancel_at_period_end = $2, cancel_at = $3, start_date = COALESCE($4, start_date) WHERE ${column} = $1 RETURNING user_id`,

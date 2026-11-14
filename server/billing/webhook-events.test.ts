@@ -94,7 +94,7 @@ vi.mock("../db", () => {
 });
 vi.mock("../auth", () => ({ getBaseUrl: () => "http://127.0.0.1:8332" }));
 vi.mock("../crm/beta", () => ({ isBetaUser: async () => false }));
-vi.mock("../account-security", () => ({ requireRecentAuth: () => true }));
+vi.mock("../account-security", () => ({ RECENT_AUTH_MS: 12 * 60 * 60_000, requireRecentAuth: () => true }));
 
 import { registerStripeRoutes } from "../stripe";
 import { billingEvents } from "./events";
@@ -108,7 +108,7 @@ import {
 } from "./invoices";
 
 const routes = new Map<string, Function>();
-registerStripeRoutes({
+registerStripeRoutes({ patch: () => {}, put: () => {}, delete: () => {},
   get: () => {},
   post: (path: string, handler: Function) => routes.set(path, handler),
 } as any);
