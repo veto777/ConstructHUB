@@ -55,6 +55,7 @@ import { registerAdsConsultantRoutes } from "./ads-consultant";
 import { registerHubRoutes } from "./hub";
 import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, isGoogleMapsPageUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
+import { trackField, allowClickTrack } from "./click-guard-collector";
 import { uploadToR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { registerPublicFileRoutes } from "./files/public-files";
 import { db, pool } from "./db";
@@ -3770,10 +3771,26 @@ export async function registerRoutes(
       res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-      const { trackingId, fingerprint, deviceType, browser, os, screenResolution, language, timezone, referrer, landingPage, userAgent } = req.body;
+      // Public and unauthenticated: every field is a short string (click-guard-collector.ts); the body itself
+      // is capped in server/index.ts.
+      const b = req.body && typeof req.body === "object" ? req.body : {};
+      const trackingId = trackField(b.trackingId, "trackingId");
+      const fingerprint = trackField(b.fingerprint, "fingerprint");
+      const deviceType = trackField(b.deviceType, "deviceType");
+      const browser = trackField(b.browser, "browser");
+      const os = trackField(b.os, "os");
+      const screenResolution = trackField(b.screenResolution, "screenResolution");
+      const language = trackField(b.language, "language");
+      const timezone = trackField(b.timezone, "timezone");
+      const referrer = trackField(b.referrer, "referrer");
+      const landingPage = trackField(b.landingPage, "landingPage");
+      const userAgent = trackField(b.userAgent, "userAgent");
 
       if (!trackingId) {
         return res.status(400).json({ message: "Missing trackingId" });
+      }
+      if (!allowClickTrack(visitorIp(req))) {
+        return res.status(429).json({ message: "Too many requests" });
       }
 
       const domain = await storage.getTrackedDomainByTrackingId(trackingId);
@@ -3786,7 +3803,7 @@ export async function registerRoutes(
       const isBlocked = await storage.isIpBlocked(domain.id, ip);
 
       const suspicionReasons: string[] = [];
-      const ua = userAgent || req.headers["user-agent"] || "";
+      const ua = userAgent || trackField(req.headers["user-agent"], "userAgent") || "";
 
       for (const pattern of BOT_PATTERNS) {
         if (pattern.test(ua)) {
@@ -4431,9 +4448,8 @@ function main() {
       }
 
       const visitorIp = req.params.visitorIp;
-      const visits = await storage.getClickVisits(domain.id);
-      const visitorVisits = visits.filter(v => v.ipAddress === visitorIp)
-        .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime());
+      // This visitor's own visits, newest first (not the newest 1000 of the whole site filtered by IP).
+      const visitorVisits = await storage.getVisitsByIp(domain.id, visitorIp);
 
       if (visitorVisits.length === 0) {
         return res.status(404).json({ message: "Visitor not found" });
