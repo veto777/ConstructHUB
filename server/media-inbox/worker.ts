@@ -363,6 +363,7 @@ export async function followUpSilent(): Promise<{ followedUp: number; newContact
   // GlobeNewswire and CFU each got two or three follow-ups seconds apart, one per thread).
   const actedOn = new Set<number>();
   for (const t of await store.silentThreads(days)) {
+    if (out.followedUp + out.newContacts >= MEDIA_INBOX_PARAMETERS.followUpsPerPass) break;
     try {
       if (await isSuppressed(t.to)) { await store.markFollowedUp(t.lastId); continue; }
       if (actedOn.has(t.partnerId) || (await store.emailedPartnerSince(t.partnerId, days, t.lastId))) { await store.markFollowedUp(t.lastId); continue; }

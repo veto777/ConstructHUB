@@ -174,6 +174,8 @@ export const MEDIA_INBOX_PARAMETERS = {
   maxRepliesPerSenderPerDay: 4,
   aiAttemptsBeforeHolding: 3,
   followUpAfterDays: 5,
+  /** Follow-ups and new-contact emails per pass, so a backlog goes out over the day, not in one burst (2026-11-14). */
+  followUpsPerPass: 8,
   maxContactsPerCompany: 3,
   newContactsPerDay: 50,
   aiOrder: ["TruthCoder", "TruthCoder 2.0", "OpenAI", "Anthropic"],
