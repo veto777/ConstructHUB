@@ -32,6 +32,7 @@
  */
 import type { Request, Response, NextFunction } from "express";
 import { allow } from "./client-auth";
+import { createHash } from "crypto";
 
 /** The caller's IP as Express resolved it (trust-proxy aware), never a raw header. */
 const clientIp = (req: Request): string => String(req.ip || req.socket?.remoteAddress || "unknown");
@@ -124,7 +125,11 @@ function idemKey(req: Request, orgId: string): string | null {
   const raw = req.headers["idempotency-key"];
   const key = Array.isArray(raw) ? raw[0] : raw;
   if (!key || typeof key !== "string" || key.length < 8 || key.length > 128) return null;
-  return `${orgId}:${req.path}:${key}`;
+  // The body is part of the key: a retry repeats the same request, so it still replays; a different request that
+  // happens to reuse a key (a page loaded before the form rotated its key per write) is a new write, not a replay.
+  let body = "";
+  try { body = createHash("sha1").update(JSON.stringify(req.body ?? null)).digest("hex").slice(0, 16); } catch { body = ""; }
+  return `${orgId}:${req.path}:${key}:${body}`;
 }
 
 function sweep(now: number) {
