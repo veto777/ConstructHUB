@@ -832,11 +832,21 @@ export function registerSiteScanRoutes(
       [randomUUID(), job, body.email, hashToken(verify), hashToken(access)],
     );
     const link = marketingBaseUrl(req) + "/free-site-scan?verify=" + verify;
-    await deps.send({
-      to: body.email,
-      subject: "Verify your ConstructHUB Site Scan email",
-      text: `Verify your email to view the full report: ${link}\nThis link expires in 7 days.`,
-    });
+    try {
+      await deps.send({
+        to: body.email,
+        subject: "Verify your ConstructHUB Site Scan email",
+        text: `Verify your email to view the full report: ${link}\nThis link expires in 7 days.`,
+      });
+    } catch {
+      // Without the verification email the report can never be unlocked; drop the queued scan
+      // and its lead so the failure does not still spend the free allowances.
+      await pool.query("DELETE FROM sitescan_leads WHERE job_id=$1", [job]);
+      await pool.query("DELETE FROM sitescan_jobs WHERE id=$1", [job]);
+      return res
+        .status(503)
+        .json({ message: "Could not send the verification email. Please retry." });
+    }
     res.status(202).json({
       access,
       message:
