@@ -132,6 +132,17 @@ describe("follow-ups", () => {
     expect(n).not.toMatch(/Hi,\n\nWe tried[\s\S]*Hi,/);
     expect(replyProblem(n)).toBeNull();
   });
+  it("never quotes an old first email the guard refuses (issue-desk #1573)", async () => {
+    const { followUpBody, newContactBody } = await import("./worker");
+    const { botTellProblem } = await import("../outbound-guard");
+    const old = "Hi,\n\nThis is an automated message from ConstructHUB about listings.\n\nBest regards,";
+    expect(botTellProblem(old)).not.toBeNull();
+    const f = followUpBody(null, "City Listings", old);
+    const n = newContactBody("City Listings", old);
+    expect(f).not.toContain("automated");
+    expect(botTellProblem(f)).toBeNull();
+    expect(botTellProblem(n)).toBeNull();
+  });
 });
 
 describe("opt-outs", () => {

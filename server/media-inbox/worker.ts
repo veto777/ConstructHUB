@@ -18,9 +18,10 @@ import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
 import { classifySites, decide, extractNextStep, keepQuotedPrices, mediaAiConfigured, planForm, readTerms, writeBrief } from "./ai";
 import { closeBrowser, readPage, submitGoogleForm, submitHtmlForm } from "./browse";
-import { answerProblem, asksIfAi, companyDomain, duplicateProblem, firstNameOf, formMessage, holdingReply, latestPerCompany, personWillReply, isOptOut, machineReason, replyProblem, replySubject, SAME_EMAIL_DAYS, supportSkip } from "./guard";
+import { answerProblem, botTellProblem, asksIfAi, companyDomain, duplicateProblem, firstNameOf, formMessage, holdingReply, latestPerCompany, personWillReply, isOptOut, machineReason, replyProblem, replySubject, SAME_EMAIL_DAYS, supportSkip } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
+import { BotTellError } from "../outbound-guard";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, supportMailboxConfig } from "./mailbox";
 import { checkMailbox } from "./verify";
 import * as store from "./store";
@@ -301,6 +302,11 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
     try {
       messageId = await sendAutomatic({ to: m.fromEmail, cc: m.cc, subject, body, inReplyTo: m.messageId, references: m.references });
     } catch (e) {
+      if (e instanceof BotTellError) {
+        await store.finishMessage(m.id, "needs_owner", [`Reply not sent: ${e.problem}`, reason].filter(Boolean).join(" — "), null, partnerId);
+        out.held++;
+        continue;
+      }
       if (!(e instanceof DuplicateSend)) throw e;
       // Just emailed them: answer on a later pass. The same email again (a second holding reply): never — it waits for the owner.
       if (e.kind === "same") {
@@ -318,15 +324,25 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
   return out;
 }
 
+/**
+ * Our earlier email as we may quote it today. First contacts from before the 2026-10-15 law carry wording the guard now
+ * refuses ("automated"); quoting one killed every pass from 10-26 on (issue-desk #1573). Such a body is swapped for the
+ * current first-contact template.
+ */
+export function quotableFirstBody(firstBody: string, company: string): string {
+  if (firstBody.trim() && !botTellProblem(firstBody)) return firstBody.trim();
+  return QUEUE_TEMPLATES.directory.body(company).trim();
+}
+
 /** The follow-up in the same thread (no model: fixed, law-safe wording). */
 export function followUpBody(firstName: string | null, company: string, firstBody: string): string {
   const hi = firstName ? `Hi ${firstName},` : "Hi,";
-  return `${hi}\n\nWe wanted to follow up on our email below about working together with ${company}. If you're not the right person, could you point us to whoever handles partnerships or listings?\n\nBest regards,\n\n--- Our earlier email ---\n${firstBody.trim()}`;
+  return `${hi}\n\nWe wanted to follow up on our email below about working together with ${company}. If you're not the right person, could you point us to whoever handles partnerships or listings?\n\nBest regards,\n\n--- Our earlier email ---\n${quotableFirstBody(firstBody, company)}`;
 }
 
 /** First contact to another address at the same company, after the first one went quiet. */
 export function newContactBody(company: string, firstBody: string): string {
-  const body = firstBody.trim().replace(/^(hi|hello|dear)[^\n]*\n+/i, "");
+  const body = quotableFirstBody(firstBody, company).replace(/^(hi|hello|dear)[^\n]*\n+/i, "");
   return `Hi,\n\nWe tried to reach ${company} at another address and may have had the wrong contact. ${body}`;
 }
 
@@ -347,50 +363,61 @@ export async function followUpSilent(): Promise<{ followedUp: number; newContact
   // GlobeNewswire and CFU each got two or three follow-ups seconds apart, one per thread).
   const actedOn = new Set<number>();
   for (const t of await store.silentThreads(days)) {
-    if (await isSuppressed(t.to)) { await store.markFollowedUp(t.lastId); continue; }
-    if (actedOn.has(t.partnerId) || (await store.emailedPartnerSince(t.partnerId, days, t.lastId))) { await store.markFollowedUp(t.lastId); continue; }
-    actedOn.add(t.partnerId);
-    if (t.followups === 0) {
-      const body = followUpBody(t.to.toLowerCase() === (t.triedEmails[0] ?? "") ? firstNameOf(t.contactName) : null, t.company, t.firstBody);
-      const subject = replySubject(t.firstSubject);
-      let messageId: string;
-      try { messageId = await sendAutomatic({ to: t.to, cc: t.cc, subject, body, inReplyTo: t.lastMessageId, references: t.references }); }
-      catch (e) {
-        if (!(e instanceof DuplicateSend)) throw e;
-        if (e.kind === "same") await store.markFollowedUp(t.lastId);
+    try {
+      if (await isSuppressed(t.to)) { await store.markFollowedUp(t.lastId); continue; }
+      if (actedOn.has(t.partnerId) || (await store.emailedPartnerSince(t.partnerId, days, t.lastId))) { await store.markFollowedUp(t.lastId); continue; }
+      actedOn.add(t.partnerId);
+      if (t.followups === 0) {
+        const body = followUpBody(t.to.toLowerCase() === (t.triedEmails[0] ?? "") ? firstNameOf(t.contactName) : null, t.company, t.firstBody);
+        const subject = replySubject(t.firstSubject);
+        let messageId: string;
+        try { messageId = await sendAutomatic({ to: t.to, cc: t.cc, subject, body, inReplyTo: t.lastMessageId, references: t.references }); }
+        catch (e) {
+          if (!(e instanceof DuplicateSend)) throw e;
+          if (e.kind === "same") await store.markFollowedUp(t.lastId);
+          continue;
+        }
+        await store.saveOutbound(mailbox, { messageId, threadKey: t.threadKey, to: t.to, cc: t.cc, subject, body, partnerId: t.partnerId, purpose: "followup" });
+        await store.markFollowedUp(t.lastId);
+        out.followedUp++;
         continue;
       }
-      await store.saveOutbound(mailbox, { messageId, threadKey: t.threadKey, to: t.to, cc: t.cc, subject, body, partnerId: t.partnerId, purpose: "followup" });
       await store.markFollowedUp(t.lastId);
-      out.followedUp++;
-      continue;
-    }
-    await store.markFollowedUp(t.lastId);
-    const tried = new Set(t.triedEmails.map((e) => e.toLowerCase()));
-    let next: string | null = null;
-    if (t.domain && tried.size < MEDIA_INBOX_PARAMETERS.maxContactsPerCompany) {
-      const found = [...(await store.knownEmails(t.domain)), ...(await followDeps.readEmails(t.domain))]
-        .map((e) => e.toLowerCase()).filter((e) => !tried.has(e) && !machineReason({ fromEmail: e, subject: "" }));
-      const fresh: string[] = [];
-      for (const e of new Set(found)) if (!(await isSuppressed(e))) fresh.push(e);
-      // Best address first; one the recipient's server refuses is dropped for the next best.
-      let left = fresh.filter((e) => !NOT_A_CONTACT.test(e));
-      for (let pick = pickEmail(left); pick; pick = pickEmail(left)) {
-        if (!(await mailboxRefused(pick))) { next = pick; break; }
-        left = left.filter((e) => e !== pick);
+      const tried = new Set(t.triedEmails.map((e) => e.toLowerCase()));
+      let next: string | null = null;
+      if (t.domain && tried.size < MEDIA_INBOX_PARAMETERS.maxContactsPerCompany) {
+        const found = [...(await store.knownEmails(t.domain)), ...(await followDeps.readEmails(t.domain))]
+          .map((e) => e.toLowerCase()).filter((e) => !tried.has(e) && !machineReason({ fromEmail: e, subject: "" }));
+        const fresh: string[] = [];
+        for (const e of new Set(found)) if (!(await isSuppressed(e))) fresh.push(e);
+        // Best address first; one the recipient's server refuses is dropped for the next best.
+        let left = fresh.filter((e) => !NOT_A_CONTACT.test(e));
+        for (let pick = pickEmail(left); pick; pick = pickEmail(left)) {
+          if (!(await mailboxRefused(pick))) { next = pick; break; }
+          left = left.filter((e) => e !== pick);
+        }
+      }
+      if (!next) {
+        await store.noteOnPartner(t.partnerId, `No reply from ${[...tried].join(", ")} after a follow-up, and no other contact address found on ${t.domain ?? "their site"}.`);
+        out.exhausted++;
+        continue;
+      }
+      const body = newContactBody(t.company, t.firstBody);
+      let messageId: string;
+      try { messageId = await sendAutomatic({ to: next, subject: t.firstSubject, body }); }
+      catch (e) { if (e instanceof DuplicateSend) continue; throw e; }
+      await store.saveOutbound(mailbox, { messageId, threadKey: null, to: next, subject: t.firstSubject, body, partnerId: t.partnerId, purpose: "outreach" });
+      out.newContacts++;
+    } catch (e: any) {
+      // One thread never stops the others or the first contacts after them (issue-desk #1573). A refused email is final:
+      // that thread is closed for follow-ups and the owner sees why; anything else is retried next pass.
+      console.error(`[media-inbox] follow-up for ${t.company} failed: ${e?.message ?? e}`);
+      void recordFailure("job", "Media inbox follow-up", e);
+      if (e instanceof BotTellError) {
+        await store.markFollowedUp(t.lastId).catch(() => undefined);
+        await store.noteOnPartner(t.partnerId, `Follow-up not sent: ${e.problem}. A person has to write to ${t.to}.`).catch(() => undefined);
       }
     }
-    if (!next) {
-      await store.noteOnPartner(t.partnerId, `No reply from ${[...tried].join(", ")} after a follow-up, and no other contact address found on ${t.domain ?? "their site"}.`);
-      out.exhausted++;
-      continue;
-    }
-    const body = newContactBody(t.company, t.firstBody);
-    let messageId: string;
-    try { messageId = await sendAutomatic({ to: next, subject: t.firstSubject, body }); }
-    catch (e) { if (e instanceof DuplicateSend) continue; throw e; }
-    await store.saveOutbound(mailbox, { messageId, threadKey: null, to: next, subject: t.firstSubject, body, partnerId: t.partnerId, purpose: "outreach" });
-    out.newContacts++;
   }
   return out;
 }
@@ -578,7 +605,13 @@ export async function sendQueued(): Promise<{ queued: number; sent: number; skip
   let sent = 0, skipped = 0;
   // Spread through the day: at most a quarter of the daily share per pass.
   for (const q of await store.nextQueued(Math.min(room, Math.max(1, Math.ceil(allowance / 4))))) {
-    if (await sendOne(q, s)) skipped++; else sent++;
+    try { if (await sendOne(q, s)) skipped++; else sent++; }
+    catch (e: any) {
+      skipped++;
+      console.error(`[media-inbox] first contact to ${q.to_email} failed: ${e?.message ?? e}`);
+      if (e instanceof BotTellError) await store.finishQueued(q.id, "skipped", `Not sent: ${e.problem}`);
+      else void recordFailure("job", "Media inbox first contact", e);
+    }
   }
   return { queued, sent, skipped };
 }
@@ -629,7 +662,10 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
         : open ? await answerPending() : { replied: 0, held: 0, failed: 0, optedOut: 0 };
       const ar = await readAutoReplies();
       const act = await actOnNextSteps();
-      const f = settings.followUps && open ? await followUpSilent() : { followedUp: 0, newContacts: 0, exhausted: 0 };
+      const none = { followedUp: 0, newContacts: 0, exhausted: 0 };
+      const f = settings.followUps && open
+        ? await followUpSilent().catch((e) => { console.error(`[media-inbox] follow-ups failed: ${e?.message ?? e}`); void recordFailure("job", "Media inbox follow-ups", e); return none; })
+        : none;
       const q = open ? await sendQueued() : { queued: 0, sent: 0 };
       await refreshBriefs().catch((e) => console.error(`[media-inbox] briefs failed: ${e?.message ?? e}`));
       await store.markPass(mailboxConfig().user, null);

@@ -10,6 +10,7 @@ import nodemailer from "nodemailer";
 import { MEDIA_SIGNATURE_TEAM, MEDIA_SIGNER } from "@shared/media-inbox";
 import { signatureHtml, signatureText } from "../email-signature";
 import { botTellProblem } from "./guard";
+import { BotTellError } from "../outbound-guard";
 
 export const mailboxConfig = (env: NodeJS.ProcessEnv = process.env) => ({
   user: env.MEDIA_EMAIL?.trim() ?? "",
@@ -175,7 +176,7 @@ export async function sendMail(m: { to: string; cc?: string | null; subject: str
   // OWNER LAW 2026-10-15: every email from media@ (replies, follow-ups, first contact, the admin form) — never one that
   // gives away a bot or a script. Refused here, at the one door all of them go through.
   const tell = botTellProblem(`${m.subject}\n${m.body}`);
-  if (tell) throw new Error(`Refused to send to ${m.to}: ${tell}`);
+  if (tell) throw new BotTellError(m.to, tell);
   const c = mailboxConfig();
   const { text, html } = composeMail(m.body, c.user);
   const info = await mailDeps.transport().sendMail({
