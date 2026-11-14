@@ -63,6 +63,26 @@ async function tableExists(name: string): Promise<boolean> {
   return !!rows[0]?.t;
 }
 
+/**
+ * Every table that holds a Stripe subscription billed to this account: the platform plan, the CRM plan, the Call
+ * Assistant and the a la carte items. Closing must cancel all of them, or a card keeps being charged for an account
+ * nobody can sign in to.
+ */
+const SUBSCRIPTION_TABLES = ["subscriptions", "crm_subscriptions", "call_assistant_subscriptions", "alacarte_subscriptions"] as const;
+
+/** The distinct Stripe subscriptions of this account that can still bill, across SUBSCRIPTION_TABLES. */
+export async function billableSubscriptionIds(userId: number): Promise<string[]> {
+  const ids = new Set<string>();
+  for (const t of SUBSCRIPTION_TABLES) {
+    if (!(await tableExists(t))) continue;
+    const { rows } = await pool.query(
+      `SELECT stripe_subscription_id FROM ${t} WHERE user_id = $1 AND stripe_subscription_id IS NOT NULL AND status = ANY($2::text[])`,
+      [userId, BILLABLE]);
+    for (const r of rows) ids.add(String(r.stripe_subscription_id));
+  }
+  return [...ids];
+}
+
 export type CloseResult =
   | { ok: true; eraseAfter: string; cancelledSubscriptions: number }
   | { ok: false; status: number; code: string; message: string; blockers?: DeletionBlocker[] };
@@ -85,15 +105,13 @@ export async function closeAccount(userId: number, deps: { cancelSubscription?: 
     };
   }
 
-  const { rows: subs } = await pool.query(
-    "SELECT stripe_subscription_id FROM subscriptions WHERE user_id = $1 AND stripe_subscription_id IS NOT NULL AND status = ANY($2::text[])",
-    [userId, BILLABLE]);
+  const subs = await billableSubscriptionIds(userId);
   const cancel = deps.cancelSubscription ?? (async (id: string) => { await stripe.subscriptions.cancel(id); });
   if (subs.length && !deps.cancelSubscription && !stripeConfigured()) {
     return { ok: false, status: 503, code: "billing_unavailable", message: "Billing can't be reached right now, so your subscription can't be cancelled. Please try again later." };
   }
   for (const s of subs) {
-    try { await cancel(String(s.stripe_subscription_id)); } catch (e: any) {
+    try { await cancel(s); } catch (e: any) {
       // Already cancelled at Stripe is fine; anything else stops here.
       if (!/no such subscription|canceled|cancelled/i.test(String(e?.message ?? ""))) {
         return { ok: false, status: 502, code: "billing_cancel_failed", message: "We couldn't cancel your subscription, so nothing was deleted. Please try again in a few minutes." };
@@ -111,12 +129,22 @@ export async function closeAccount(userId: number, deps: { cancelSubscription?: 
 
   const grantTables: string[] = [];
   for (const t of GRANT_TABLES) if (await tableExists(t)) grantTables.push(t);
+  // The CRM plan and a la carte rows lose access now (their webhook handlers finish the row when Stripe reports
+  // the end). The Call Assistant row is left to its webhook, which owns the usage settlement.
+  const hasCrmSubs = await tableExists("crm_subscriptions");
+  const hasAlacarteSubs = await tableExists("alacarte_subscriptions");
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     await client.query(
       `UPDATE subscriptions SET status = 'canceled', cancel_at_period_end = false
         WHERE user_id = $1 AND status = ANY($2::text[])`, [userId, BILLABLE]).catch(() => undefined);
+    if (hasCrmSubs) await client.query(
+      `UPDATE crm_subscriptions SET status = 'canceled', cancel_at_period_end = NULL, updated_at = now()
+        WHERE user_id = $1 AND status = ANY($2::text[])`, [userId, BILLABLE]);
+    if (hasAlacarteSubs) await client.query(
+      `UPDATE alacarte_subscriptions SET status = 'canceled', cancel_at_period_end = NULL, updated_at = now()
+        WHERE user_id = $1 AND status = ANY($2::text[])`, [userId, BILLABLE]);
     for (const t of grantTables) await client.query(`DELETE FROM ${t} WHERE user_id = $1`, [userId]);
     // ConstructHUB Direct (server/social/native.ts): connected accounts, their encrypted tokens and pending sign-ins
     // are stored per tenant `chu<user>b<business>`.
@@ -161,12 +189,9 @@ export function registerAccountDeletionRoutes(app: Express, getDevUser: (req: an
   app.get("/api/account/delete/preflight", async (req: Request, res: Response) => {
     const user = getDevUser(req, res);
     if (!user) return;
-    const [blockers, { rows: subs }] = await Promise.all([
-      deletionBlockers(user.id),
-      pool.query("SELECT count(*)::int AS n FROM subscriptions WHERE user_id = $1 AND stripe_subscription_id IS NOT NULL AND status = ANY($2::text[])", [user.id, BILLABLE]),
-    ]);
+    const [blockers, subs] = await Promise.all([deletionBlockers(user.id), billableSubscriptionIds(user.id)]);
     res.setHeader("Cache-Control", "no-store");
-    res.json({ blockers, activeSubscriptions: Number(subs[0]?.n ?? 0), eraseAfterDays: ERASE_AFTER_DAYS });
+    res.json({ blockers, activeSubscriptions: subs.length, eraseAfterDays: ERASE_AFTER_DAYS });
   });
 
   /** Settings → Delete account → "Delete my account": closes it now (recent sign-in + typing DELETE required).
