@@ -283,6 +283,8 @@ export default function CrmPriceBookPage() {
   const invalidate = () => {
     ["items", "materials", "labor-rates"].forEach((k) =>
       queryClient.invalidateQueries({ queryKey: [`/api/crm/pricebook/${k}`] }));
+    // The estimate builders cache each search under its own "…/items?q=" key.
+    queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/pricebook/items?") });
     // SKU previews are priced from those same items, materials and labor
     // rates — re-price them too, or an open preview keeps the pre-edit total.
     queryClient.invalidateQueries({

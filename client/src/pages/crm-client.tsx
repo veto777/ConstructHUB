@@ -2112,6 +2112,7 @@ export default function CrmClientPage() {
                                 await apiRequest("PATCH", `/api/crm/pricebook/items/${it.pricebookItemId}`, { [it.listField!]: it.unitPriceCents });
                                 setTabItems((cur) => cur.map((x, i) => i === idx ? { ...x, listPriceCents: it.unitPriceCents } : x));
                                 queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook/items"] });
+                                queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/pricebook/items?") });
                                 toast({ title: `Price book updated to ${money(it.unitPriceCents)}`, description: it.name });
                               } catch (e: any) {
                                 toast({ title: "Could not update the price book", description: apiErrorMessage(e), variant: "destructive" });
