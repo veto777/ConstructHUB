@@ -56,6 +56,7 @@ import { registerHubRoutes } from "./hub";
 import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, isGoogleMapsPageUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { trackField, allowClickTrack } from "./click-guard-collector";
+import { cleanReviewPhotos } from "./review-photos";
 import { uploadToR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { registerPublicFileRoutes } from "./files/public-files";
 import { db, pool } from "./db";
@@ -5443,7 +5444,9 @@ function main() {
       if (await hiddenFromReviews(user.id, crmLink.crmOrgId, crmLink.crmCustomerId, String(clientEmail))) {
         return res.status(409).json({ message: "This client is hidden from review requests. Unhide them under Ready to ask to send one." });
       }
-      const uploadedPhotos = Array.isArray(photos) ? photos : [];
+      // Uploaded and Media Library photos only: these become image and download links on the public review page.
+      const uploadedPhotos = cleanReviewPhotos(photos);
+      if (!uploadedPhotos) return res.status(400).json({ message: "One of the attached photos could not be used. Remove it and attach it again." });
       if (uploadedPhotos.length + (crmLink.photos?.length ?? 0) > HOMEOWNER_PICK_MAX) return res.status(400).json({ message: `Up to ${HOMEOWNER_PICK_MAX} photos per review request.` });
 
       const token = randomUUID();
@@ -5478,7 +5481,16 @@ function main() {
         // Customer-facing link: always the configured public origin, never the request host —
         // a request sent from the CRM portal host would land the customer on the sign-in screen.
         const baseUrl = canonicalAppOrigin();
-        await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
+        try {
+          await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
+        } catch (sendErr: any) {
+          // A send that may have reached the customer keeps its row (their link must keep working).
+          if (sendErr?.ambiguous) throw sendErr;
+          // Nothing went out, so nothing is kept as "sent": the owner can press Send again without a duplicate.
+          logError("Review request email failed:", sendErr);
+          await storage.permanentlyDeleteReviewRequest(request.id).catch((e) => logError("Review request cleanup failed:", e));
+          return res.status(502).json({ message: "The email could not be sent. Check the address and try again." });
+        }
 
         const reminderSettings = await storage.getReminderSettings(user.id);
         // Reminders are a Team-and-up feature: a plan without the module sends the
