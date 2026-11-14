@@ -887,7 +887,7 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     if (lead.status === "converted" && lead.customerId) {
       const [existing] = await db.select().from(crmCustomers)
         .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, lead.customerId))).limit(1);
-      if (existing) return res.json({ lead, customer: existing, createdClient: false, projectId: null });
+      if (existing) return res.json({ lead, customer: { id: existing.id, displayName: existing.displayName }, createdClient: false, projectId: null });
     }
     // Claim the lead before creating anything: of two concurrent converts only one gets the row.
     const [claimed] = await db.update(crmLeads).set({ status: "converting", updatedAt: new Date() })

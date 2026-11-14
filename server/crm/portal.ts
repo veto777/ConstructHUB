@@ -94,8 +94,10 @@ async function senderReplyTo(createdByMemberId: string | null | undefined, fallb
   return fallback || undefined;
 }
 
+// Same rule as lead-capture.ts: the left-most X-Forwarded-For is whatever the
+// sender wrote, so it is never trusted (req.ip already honours "trust proxy").
 const clientIp = (req: any) =>
-  String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
+  String(req.headers["cf-connecting-ip"] || req.ip || "")
     .split(",")[0].trim().slice(0, 60);
 
 /**
