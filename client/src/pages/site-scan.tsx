@@ -956,6 +956,8 @@ export default function SiteScanPage() {
               <label key={l.id} className="block text-sm">
                 <input
                   type="checkbox"
+                  disabled={!l.website}
+                  title={l.website ? undefined : "Add a website to this location before queueing a scan"}
                   checked={checked.includes(l.id)}
                   onChange={(e) =>
                     setChecked(
