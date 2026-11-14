@@ -84,9 +84,17 @@ export async function deleteForExternalUser(platform: Network, externalUserId: s
   let deleted = 0;
   if (exists) {
     const r = await pool.query(
-      "DELETE FROM social_native_accounts WHERE platform = ANY($2::text[]) AND (owner_user_id = $1 OR external_id = $1)",
+      "DELETE FROM social_native_accounts WHERE platform = ANY($2::text[]) AND (owner_user_id = $1 OR external_id = $1) RETURNING id",
       [externalUserId, platforms]);
     deleted = r.rowCount ?? 0;
+    // The cached account list of each connection drops them too (as removeTikTokOpenId does in native.ts), so the
+    // account no longer shows as connected or receives posts.
+    const ids = r.rows.map((x: any) => String(x.id));
+    if (ids.length && (await pool.query("SELECT to_regclass('social_connections') AS t")).rows[0]?.t) {
+      await pool.query(
+        `UPDATE social_connections SET accounts=COALESCE((SELECT jsonb_agg(a) FROM jsonb_array_elements(accounts) a WHERE NOT (a->>'id' = ANY($1::text[]))),'[]'::jsonb),updated_at=now()
+         WHERE jsonb_typeof(accounts)='array' AND EXISTS (SELECT 1 FROM jsonb_array_elements(accounts) a WHERE a->>'id' = ANY($1::text[]))`, [ids]);
+    }
   }
   const code = newConfirmationCode();
   await pool.query(

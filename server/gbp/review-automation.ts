@@ -122,6 +122,10 @@ export async function processReplies(userId:number,id:number,generate=generateRe
     const plan=await replyEntitlement(userId);
     if(!plan.drafts)return;
     const s=replySettingsSchema.parse(config.settings);
+    // This location's automation lock is held, so nothing else is generating: a row still marked 'generating'
+    // was cut off (a restart mid-reply) and is picked up again instead of waiting forever.
+    await pool.query(`UPDATE gbp_review_automation a SET ai_status=NULL FROM google_profile_reviews r
+      WHERE a.review_id=r.id AND a.user_id=$1 AND r.user_id=$1 AND r.location_id=$2 AND a.ai_status='generating'`,[userId,id]);
     const {rows}=await pool.query(`SELECT r.*,a.backfill FROM google_profile_reviews r JOIN gbp_review_automation a ON a.review_id=r.id
       WHERE r.user_id=$1 AND r.location_id=$2 AND NOT r.google_deleted AND r.reply_comment IS NULL AND r.reply_draft IS NULL
       AND r.google_review_id LIKE 'accounts/%/locations/%/reviews/%'
