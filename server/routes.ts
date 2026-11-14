@@ -5401,6 +5401,9 @@ function main() {
       }
 
       if (typeof clientEmail !== "string" || !z.string().email().safeParse(clientEmail.trim()).success) return res.status(400).json({ message: "Valid client email required" });
+      // "Schedule for later" with a time that has already passed is refused rather than sent on the spot
+      // (a minute of slack for the click itself).
+      if (scheduledFor && !(new Date(scheduledFor).getTime() > Date.now() - 60_000)) return res.status(400).json({ message: "That time has already passed. Pick a later time, or turn off Schedule to send now." });
       if (await isReviewSuppressed(user.id, clientEmail)) return res.status(409).json({ message: "This recipient has unsubscribed from your review requests. Only the customer can resubscribe." });
 
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
