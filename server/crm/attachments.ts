@@ -968,6 +968,10 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       .limit(1);
     if (!est) return res.status(404).json({ message: "Not found" });
     if (!(await requireDocSession(req, res, est.customerId))) return;
+    // Same rule as the estimate page: an expired, unanswered estimate serves no content.
+    if (est.expiresAt && est.expiresAt.getTime() < Date.now() && !est.approvedAt && !est.declinedAt) {
+      return res.status(410).json({ message: "This estimate has expired.", expired: true });
+    }
 
     const rows = await db
       .select()
@@ -996,6 +1000,10 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       .limit(1);
     if (!est) return res.status(404).json({ message: "Not found" });
     if (!(await requireDocSession(req, res, est.customerId))) return;
+    // Same rule as the estimate page: an expired, unanswered estimate serves no content.
+    if (est.expiresAt && est.expiresAt.getTime() < Date.now() && !est.approvedAt && !est.declinedAt) {
+      return res.status(410).json({ message: "This estimate has expired.", expired: true });
+    }
 
     const [att] = await db
       .select()
