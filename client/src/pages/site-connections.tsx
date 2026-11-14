@@ -590,7 +590,10 @@ export function LocationSearchSummary({ locationId, businessName, hideWhenEmpty 
           />
         )}
         <p className="font-medium">
-          Google Search Console · property totals · last 30 days
+          Google Search Console · property totals
+          {s?.first_day && s?.last_day
+            ? ` · ${String(s.first_day)} to ${String(s.last_day)}`
+            : " · last 30 days"}
         </p>
         <p className="text-sm text-muted-foreground">
           {s
