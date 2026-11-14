@@ -64,7 +64,7 @@ export async function notifyHoverReportReady(orgId: string, report: HoverReportF
     return await notifyOrgOwners({
       org, pref: "hoverReportReady", subject: n.title,
       bodyHtml: `<p style="font-size:15px;margin:0 0 8px">${esc(n.title)}</p>` + (n.body ? `<p style="color:#555;margin:0">${esc(n.body)}</p>` : ""),
-      link: n.link ? `${process.env.PUBLIC_BASE_URL ?? ""}${n.link}` : undefined,
+      link: n.link ?? undefined,
       linkLabel: report.customerId ? "Open the client" : "Open the CRM",
     });
   } catch (e: any) {
