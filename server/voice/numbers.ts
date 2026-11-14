@@ -46,6 +46,8 @@ export const HELD_STATUSES = ["pending", "active", "releasing"] as const;
 const LABEL_MAX = 60, LOCATION_MAX = 120;
 /** A purchase still `pending` after this long was interrupted; it can be dismissed. */
 const STALE_PENDING_MS = 10 * 60_000;
+/** A manual release still marked 'releasing' (no reason) after this long was interrupted and may be run again. */
+const STUCK_RELEASE_MS = 2 * 60_000;
 
 /** Forwarding instructions the Numbers tab shows (static copy; §13). Codes vary by line type — the copy says so. */
 export const FORWARDING_CARRIERS: readonly { id: string; name: string; kind: "mobile" | "landline" | "tracking" | "tollfree" | "voip"; steps: string[]; off?: string; note?: string }[] = [
@@ -388,7 +390,12 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
         message: `${row.phoneNumber} is already being released because ${releaseReasonText(row.releaseReason)}${at ? `; it goes back to the carrier on ${at}` : ""}.`,
       });
     }
-    if (row.status === "pending" || row.status === "releasing") return res.status(409).json({ code: "busy", message: "That number is still being set up or released. Try again in a minute." });
+    // A manual release that was cut off between marking the row and the carrier's answer (a restart in that
+    // window) leaves 'releasing' with no reason, which nothing else picks up. The carrier call takes 20 s at most,
+    // so after a few minutes it is safe to run the release again (it is idempotent: 404 means already gone).
+    const stuckRelease = row.status === "releasing" && !row.releaseReason
+      && (row.updatedAt ?? row.createdAt ?? new Date()).getTime() < Date.now() - STUCK_RELEASE_MS;
+    if (row.status === "pending" || (row.status === "releasing" && !stuckRelease)) return res.status(409).json({ code: "busy", message: "That number is still being set up or released. Try again in a minute." });
     const eligible = row.releaseEligibleAt ?? releaseEligibleAt(row.purchasedAt ?? new Date());
     if (eligible.getTime() > Date.now()) {
       return res.status(409).json({
