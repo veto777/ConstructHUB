@@ -391,11 +391,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAllSearchQueries(owner: OwnerScope): Promise<void> {
-    const allQueries = await db.select({ id: searchQueries.id }).from(searchQueries).where(ownedBy(searchQueries.userId, owner));
+    // "Clear all" is this account's own history only. An admin's read scope also covers the ownerless
+    // scheduled-refresh queries (ownedBy), and clearing with it wiped every schedule's stored results (audit 08 #4b).
+    const own = eq(searchQueries.userId, owner.id);
+    const allQueries = await db.select({ id: searchQueries.id }).from(searchQueries).where(own);
     for (const q of allQueries) {
       await db.delete(searchResults).where(eq(searchResults.queryId, q.id));
     }
-    await db.delete(searchQueries).where(ownedBy(searchQueries.userId, owner));
+    await db.delete(searchQueries).where(own);
   }
 
   async getSearchResults(queryId: number): Promise<SearchResult[]> {
