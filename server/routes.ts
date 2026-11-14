@@ -34,7 +34,7 @@ import { scheduleIntervalMs } from "@shared/scrape-schedules";
 import { COMPETITOR_RADIUS_MAX, COMPETITOR_RADIUS_MIN } from "@shared/competitor-scan";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
 import { readSearchPage, SEARCH_PAGE_MESSAGE } from "./search-page";
-import { effectiveVpnMode, savedVpnMode, VPN_DEFAULT_MODE } from "./vpn-mode";
+import { effectiveVpnMode, savedVpnMode, VPN_DEFAULT_MODE, VPN_TRACK_ID_MAX, vpnTrackFields, vpnTrackLimiter } from "./vpn-mode";
 import { getAdapter } from "./scrapers/registry";
 import { liveSearchOutcome } from "./live-search-outcome";
 import { randomUUID } from "crypto";
@@ -4755,21 +4755,37 @@ function main() {
   // VPN Shield collector: matches the visitor IP against known VPN-provider/datacenter
   // prefixes plus WebRTC-leak and extension signals; on detection writes vpn_visits with
   // the site's configured action (block/log/redirect) and tells the script what to do.
+  // Anonymous and firewall-exempt, so it is bounded here (audit 08 #1): the body is capped at 16 KB in
+  // server/index.ts, stored strings are cut to fixed lengths, and calls are counted per visitor address
+  // and per site. Over the limit the script is told "not blocked" (it never breaks the customer's page).
+  const vpnTrackIpLimit = vpnTrackLimiter(120, 60_000);
+  const vpnTrackSiteLimit = vpnTrackLimiter(1200, 60_000);
   app.post("/api/vpn-shield/track", async (req, res) => {
     try {
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-      const { trackingId, fingerprint, deviceType, browser, os, referrer, landingPage, userAgent, vpnSignals } = req.body;
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const { trackingId, vpnSignals } = body;
+      const { fingerprint, deviceType, browser, os, referrer, landingPage, userAgent } = vpnTrackFields(body);
       if (!trackingId) return res.status(400).json({ message: "Missing trackingId" });
+      if (typeof trackingId !== "string" || trackingId.length > VPN_TRACK_ID_MAX) return res.status(204).end();
+
+      const ip = visitorIp(req);
+      if (!vpnTrackIpLimit.allow(ip, Date.now())) {
+        res.setHeader("Retry-After", "60");
+        return res.status(429).json({ blocked: false, reason: "rate_limited" });
+      }
 
       const domain = await storage.getTrackedDomainByTrackingId(trackingId);
       if (!domain || !domain.isActive) return res.status(204).end();
+      if (!vpnTrackSiteLimit.allow(String(domain.id), Date.now())) {
+        res.setHeader("Retry-After", "60");
+        return res.status(429).json({ blocked: false, reason: "rate_limited" });
+      }
 
-      const ip = visitorIp(req);
-
-      const ua = userAgent || req.headers["user-agent"] || "";
+      const ua = userAgent || String(req.headers["user-agent"] || "").slice(0, 500);
 
       if (isCrawler(ua)) {
         return res.json({ blocked: false, reason: "crawler" });

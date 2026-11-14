@@ -67,6 +67,10 @@ app.use("/api/ads", express.json({ limit: "512kb" }));
 app.use("/api/seo", express.json({ limit: "1mb" }));
 app.use("/api/gbp/content", express.json({ limit: "512kb" }));
 app.use("/api/mail-alerts", express.json({ limit: "256kb" }));
+// VPN Shield's tracking beacon is anonymous and firewall-exempt (audit 08 #1): a real page view sends a few
+// hundred bytes, so it is capped here before the 50 MB parser below can read it into memory.
+import { VPN_TRACK_BODY_LIMIT } from "./vpn-mode";
+app.use("/api/vpn-shield/track", express.json({ limit: VPN_TRACK_BODY_LIMIT }));
 app.use(
   express.json({
     limit: "50mb",
