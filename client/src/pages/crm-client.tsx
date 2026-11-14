@@ -47,7 +47,7 @@ import { EstimateDefaultFiles } from "@/components/estimate-attachments-card";
 import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { CustomerMeasurements } from "@/components/client-measurements";
 import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
-import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
+import { TakePaymentDialog, invoiceDueCents, uploadPaymentProof } from "@/components/crm-take-payment";
 import { deadLeadOf } from "@shared/bid-status";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
@@ -803,13 +803,23 @@ export default function CrmClientPage() {
   const [payNote, setPayNote] = useState("");
   // What the button records, in whole cents — "0.001" is $0.00, not a payment.
   const payAmountCents = Math.round((parseFloat(payAmount) || 0) * 100);
+  // The photo or copy of the check: Settings can ask for one (or require it) on check and cash.
+  const { data: payStatus } = useQuery<any>({ queryKey: ["/api/crm/payments/status"], enabled: !!payFor });
+  const payPhotoRule: "off" | "optional" | "required" = payStatus?.reconcile?.photo ?? "optional";
+  const [payProof, setPayProof] = useState<File | null>(null);
+  const payProofRef = useRef<HTMLInputElement>(null);
+  const payNeedsPhoto = payPhotoRule === "required" && (payMethod === "check" || payMethod === "cash");
+  useEffect(() => { setPayProof(null); }, [payFor?.id]);
   const recordPayment = useMutation({
-    mutationFn: async () =>
-      (await apiRequest("POST", `/api/crm/invoices/${payFor.id}/payments`, {
+    mutationFn: async () => {
+      const proofAttachmentId = payProof ? await uploadPaymentProof(payFor.customerId ?? id, payProof) : null;
+      return (await apiRequest("POST", `/api/crm/invoices/${payFor.id}/payments`, {
         amountCents: payAmountCents,
         method: payMethod,
         note: payNote || null,
-      })).json(),
+        ...(proofAttachmentId ? { proofAttachmentId } : {}),
+      })).json();
+    },
     onSuccess: (r: any) => {
       const number = payFor?.number;
       setPayFor(null); setPayAmount(""); setPayNote("");
@@ -2905,6 +2915,15 @@ export default function CrmClientPage() {
               <Input id="pay-note" value={payNote} onChange={(e) => setPayNote(e.target.value)}
                 placeholder="Check #1042" />
             </div>
+            {payPhotoRule !== "off" && (
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span>Photo or copy of the check{payNeedsPhoto ? <span className="text-destructive"> *</span> : <span className="text-muted-foreground"> (optional)</span>}
+                  {payProof && <span className="text-muted-foreground" data-testid="text-payment-photo-name"> · {payProof.name}</span>}</span>
+                <Button size="sm" variant="outline" className="h-7" onClick={() => payProofRef.current?.click()} data-testid="button-payment-photo">{payProof ? "Change" : "Add"}</Button>
+                <input ref={payProofRef} type="file" accept="image/*,application/pdf" capture="environment" className="hidden"
+                  onChange={(ev) => setPayProof(ev.target.files?.[0] ?? null)} data-testid="input-payment-photo" />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button onClick={() => confirmAction({
@@ -2914,7 +2933,7 @@ export default function CrmClientPage() {
                 confirmLabel: "Yes, record it", destructive: false,
                 onConfirm: () => recordPayment.mutate(),
               })}
-              disabled={payAmountCents < 1 || recordPayment.isPending} data-testid="button-save-payment">
+              disabled={payAmountCents < 1 || recordPayment.isPending || (payNeedsPhoto && !payProof)} data-testid="button-save-payment">
               {recordPayment.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Record {payAmountCents >= 1 ? money(payAmountCents) : "payment"}
             </Button>
