@@ -69,13 +69,19 @@ export async function notifyOrgOwners(args: {
   const to = await orgOwnerEmails(args.org.id, args.excludeEmails);
   if (!to.length) return false;
 
+  // The bell keeps the relative /crm/... link (the in-app router and the
+  // workspace filter read it); a mail client needs an absolute one.
+  const href = !args.link || /^https?:\/\//i.test(args.link)
+    ? args.link
+    : `${(process.env.PORTAL_URL || "https://portal.constructhub.us").trim().replace(/\/+$/, "")}${args.link}`;
+
   await sendWithFallback({
     to: to.join(","),
     subject: args.subject,
     html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">` +
       args.bodyHtml +
       (args.link
-        ? `<p style="margin:20px 0"><a href="${args.link}" style="background:#4f46e5;color:#fff;padding:11px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block">${esc(args.linkLabel ?? "Open in the CRM")}</a></p>`
+        ? `<p style="margin:20px 0"><a href="${esc(href)}" style="background:#4f46e5;color:#fff;padding:11px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block">${esc(args.linkLabel ?? "Open in the CRM")}</a></p>`
         : "") +
       `</div>`,
   } as any).catch((e: any) => console.error("[crm] owner notify failed:", e?.message || e));

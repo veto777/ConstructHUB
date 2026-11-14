@@ -42,7 +42,7 @@ import { getEntitlements, raiseHint, sendLimitReached, textingNumbersAllowance }
 import { reserveQuotaFor, refundReservation, monthKey, type LimitReachedBody, type QuotaReservation } from "../growth-quotas";
 import { PLANS, PLAN_KEYS, UNLIMITED, type PlanKey, type PlanLimits } from "@shared/plans";
 import { logEvent, presentEstimate } from "./entities";
-import { smsSegments } from "./sms-segments";
+import { smsSegments, gsmSafeText } from "./sms-segments";
 import { pushSoon } from "../apns";
 import { getCrmEntitlements } from "./entitlements";
 import { CRM_PLANS, CRM_PLAN_KEYS, type CrmPlanLimits } from "@shared/crm-plans";
@@ -438,6 +438,8 @@ export async function sendSms(
   orgCustomFields?: unknown,
   orgId?: string,
 ): Promise<SmsResult> {
+  // Plain punctuation before metering: an em dash would bill the text as UCS-2.
+  body = gsmSafeText(body);
   const sender = resolveSmsSender(orgCustomFields);
   if (sender?.mode === "dedicated" && !await dedicatedSmsAllowed(orgId, sender.from)) {
     // Do not silently reroute a client-facing text onto the shared number.
@@ -608,8 +610,12 @@ export async function maybeAlertReengagement(args: {
     smsProvider: smsResult?.provider ?? null,
     smsError: smsResult?.error ?? null,
   };
-  await db.update(crmEstimates).set({ customFields: cf, updatedAt: new Date() })
-    .where(eq(crmEstimates.id, est.id));
+  // Only this key is written: `cf` is the caller's copy from before the sends,
+  // and writing it back whole dropped anything saved in between (a reminder entry).
+  await db.update(crmEstimates).set({
+    customFields: sql`jsonb_set(coalesce(${crmEstimates.customFields}, '{}'::jsonb), '{reengagementAlerts}', ${JSON.stringify(cf.reengagementAlerts)}::jsonb)`,
+    updatedAt: new Date(),
+  }).where(eq(crmEstimates.id, est.id));
   return true;
 }
 

@@ -95,8 +95,10 @@ async function senderReplyTo(createdByMemberId: string | null | undefined, fallb
   return fallback || undefined;
 }
 
+// Same rule as lead-capture.ts: the left-most X-Forwarded-For is whatever the
+// sender wrote, so it is never trusted (req.ip already honours "trust proxy").
 const clientIp = (req: any) =>
-  String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
+  String(req.headers["cf-connecting-ip"] || req.ip || "")
     .split(",")[0].trim().slice(0, 60);
 
 /**
@@ -825,7 +827,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         ? { approvedTotalCents: approval.totals.totalCents, selectedDiscounts: approval.selections }
         : {}),
       updatedAt: new Date(),
-    }).where(eq(crmEstimates.id, est.id)).returning();
+    }).where(and(eq(crmEstimates.id, est.id), isNull(crmEstimates.approvedAt), isNull(crmEstimates.declinedAt))).returning();
+    // A second response that raced this one (double tap, two signers) lost:
+    // nothing below (contract, stage, webhooks) may run twice.
+    if (!row) return res.status(409).json({ message: "This estimate has already been responded to." });
 
     await logEvent(est.orgId, est.id, approve ? "approved" : "declined", "client", req, {
       signatureName: parsed.data.signatureName, reason: parsed.data.reason,
@@ -1692,7 +1697,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }));
 
     res.json({
-      customer: { displayName: cust.displayName, email: cust.email, phone: cust.phone },
+      // Name only: this link needs no sign-in, and the page shows nothing else of the client.
+      customer: { displayName: cust.displayName },
       company: {
         name: org.name, phone: org.phone, email: org.email,
         website: org.website, logoUrl: org.logoUrl,

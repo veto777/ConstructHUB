@@ -924,13 +924,25 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       phaseId: z.string().nullable().optional(), notes: z.string().max(2000).nullable().optional(),
     })).max(500) }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid budget", issues: parsed.error.issues });
-    await db.delete(crmBudgetLines)
-      .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.projectId, proj.id)));
-    if (parsed.data.lines.length) {
-      await db.insert(crmBudgetLines).values(parsed.data.lines.map((l) => ({
-        ...l, orgId: ctx.org.id, projectId: proj.id,
-      })) as any);
+    // Same reference check as the single-line routes, once per distinct pair.
+    const checked = new Set<string>();
+    for (const l of parsed.data.lines) {
+      const key = `${l.costCodeId}|${l.phaseId ?? ""}`;
+      if (checked.has(key)) continue;
+      checked.add(key);
+      const refErr = await budgetLineRefsError(ctx.org.id, proj.id, l.costCodeId, l.phaseId);
+      if (refErr) return res.status(400).json({ message: refErr });
     }
+    // One transaction: a failed insert must not leave the project with no budget.
+    await db.transaction(async (tx) => {
+      await tx.delete(crmBudgetLines)
+        .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.projectId, proj.id)));
+      if (parsed.data.lines.length) {
+        await tx.insert(crmBudgetLines).values(parsed.data.lines.map((l) => ({
+          ...l, orgId: ctx.org.id, projectId: proj.id,
+        })) as any);
+      }
+    });
     res.json({ ok: true, count: parsed.data.lines.length });
   });
 
@@ -1407,7 +1419,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const [row] = await db.update(crmProjects)
       .set({ ...parsed.data, updatedAt: new Date() } as any)
       .where(eq(crmProjects.id, proj.id)).returning();
-    res.json(row);
+    res.json(stripMoney(ctx, row, { price: ["contractValueCents"], cost: ["budgetCents"] }));
   });
 
   // ══ PUBLIC API KEYS + WEBHOOKS ════════════════════════════════════════════
@@ -1615,8 +1627,8 @@ export function registerCrmPhaseRoutes(app: Express, getDevUser: GetUser): void 
     const parsed = z.object({
       name: z.string().min(1).max(150),
       sortOrder: z.number().int().min(0).max(999).default(0),
-      startDate: z.string().nullable().optional(),
-      endDate: z.string().nullable().optional(),
+      startDate: z.string().refine((v) => !v || !Number.isNaN(Date.parse(v)), "Enter a valid date.").nullable().optional(),
+      endDate: z.string().refine((v) => !v || !Number.isNaN(Date.parse(v)), "Enter a valid date.").nullable().optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid phase", issues: parsed.error.issues });
     const [proj] = await db.select().from(crmProjects)

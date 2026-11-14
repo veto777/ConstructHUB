@@ -155,11 +155,12 @@ export async function emitCrmEvent(orgId: string, event: string, payload: any): 
         }
         if (attempt < 2) await new Promise((r) => setTimeout(r, 500 * Math.pow(3, attempt)));
       }
+      const failures = lastStatus >= 200 && lastStatus < 300 ? 0 : (h.failureCount ?? 0) + 1;
       await db.update(crmWebhooks).set({
         lastStatus, lastAttemptAt: new Date(),
-        failureCount: lastStatus >= 200 && lastStatus < 300 ? 0 : (h.failureCount ?? 0) + 1,
+        failureCount: failures,
         // Auto-disable after sustained failure so we stop hammering dead URLs.
-        active: (h.failureCount ?? 0) + 1 < 20,
+        active: failures < 20,
       }).where(eq(crmWebhooks.id, h.id)).catch(() => {});
     }));
   } catch (e: any) {
@@ -496,6 +497,9 @@ async function resolveStripeMethod(
   }
 }
 
+const escHtml = (s?: string | null) =>
+  String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
+
 /** Tell the contractor money landed. `methodDetail` names the real rail
  *  ("Visa •••• 4242", "bank transfer (ACH) — Chase •••• 6789") when known. */
 async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: string | null = null) {
@@ -531,7 +535,7 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: st
     await sendWithFallback({
       to: [...to].join(","),
       subject: `💰 ${amount} received from ${cust?.displayName ?? "a client"}`,
-      html: `<p><strong>${amount}</strong> received from ${cust?.displayName ?? "a client"}${via}.</p>` +
+      html: `<p><strong>${escHtml(amount)}</strong> received from ${escHtml(cust?.displayName ?? "a client")}${escHtml(via)}.</p>` +
             `<p>Paid directly into your own Stripe account.</p>`,
     } as any);
   }
