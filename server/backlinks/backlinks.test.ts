@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildQueryBank, hitsFromItems, isExcluded, normalizeDomain, parseImportLine, QUERY_TEMPLATES, NICHES, US_STATES, US_CITIES } from "./discover";
-import { analyzePage, classifyKind, decodeCfEmail, gradeSource, mergeSignals, readSite, spelledOutEmails, vetDeps } from "./vet";
+import { analyzePage, classifyKind, decodeCfEmail, gradeSource, mergeSignals, readSite, safeDecode, spelledOutEmails, vetDeps } from "./vet";
 import { contactLinks, findContacts } from "./contacts";
 import { listPages, relatedSites } from "./expand";
 import { composePitch, siteName, pickEmail, sendBlocker, outreachConfig, withFooter } from "./outreach";
@@ -471,5 +471,17 @@ describe("duplicates never get a pitch (owner 2026-10-25)", () => {
     expect(await withDb(talked.db, () => pitchConflict("editor@cfu.org", "cfu.org", "draft"))).toMatch(/Partnerships conversation/);
     const partner = fakeDb([[/to_regclass/, [{ m: true, p: true }]], [/FROM media_partners/, [{ company: "CFU" }]]]);
     expect(await withDb(partner.db, () => pitchConflict("other@cfu.org", "cfu.org", "draft"))).toMatch(/CFU is already a Partnerships company/);
+  });
+});
+
+// Audit L18: decodeURIComponent throws on a stray "%"; one such link used to abort the whole page read.
+describe("a stray % in a URL path", () => {
+  it("is read as written instead of throwing", () => {
+    expect(safeDecode("/100%-financing")).toBe("/100%-financing");
+    expect(safeDecode("/write%20for%20us")).toBe("/write for us");
+    const html = `<html lang="en"><head><title>Roofing</title></head><body><h1>Roofing</h1><a href="/100%-financing">Financing</a><a href="/contact%">Contact</a></body></html>`;
+    expect(() => analyzePage({ url: "https://example-roofing.com/100%-financing", status: 200, body: html })).not.toThrow();
+    expect(() => contactLinks(html, "https://example-roofing.com/", "example-roofing.com")).not.toThrow();
+    expect(() => listPages(html, "https://example-roofing.com/", "example-roofing.com")).not.toThrow();
   });
 });

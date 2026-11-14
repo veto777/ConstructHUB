@@ -5,7 +5,7 @@
  */
 import * as cheerio from "cheerio";
 import { normalizeDomain } from "./discover";
-import { extractEmails, vetDeps } from "./vet";
+import { extractEmails, safeDecode, vetDeps } from "./vet";
 
 /** Same-site pages worth reading for an address, best first. */
 const PAGE_KINDS: { re: RegExp; rank: number }[] = [
@@ -29,7 +29,7 @@ export function contactLinks(html: string, pageUrl: string, domain: string): str
     const host = normalizeDomain(abs.href);
     if (!host || (host !== domain && !host.endsWith(`.${domain}`))) return;
     if (/\.(pdf|jpe?g|png|gif|zip|docx?)$/i.test(abs.pathname)) return;
-    const label = `${$(a).text()} ${decodeURIComponent(abs.pathname)}`.toLowerCase().replace(/[-_/]+/g, " ");
+    const label = `${$(a).text()} ${safeDecode(abs.pathname)}`.toLowerCase().replace(/[-_/]+/g, " ");
     const kind = PAGE_KINDS.find((k) => k.re.test(label));
     if (!kind) return;
     abs.hash = "";

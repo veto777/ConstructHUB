@@ -39,6 +39,9 @@ export async function ensureCitationsSchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS citation_audits_campaign_idx ON citation_audits (campaign_id, id DESC);
   `);
+  // An audit runs inside the process (no lease), and this runs once at boot: whatever is still queued or
+  // running was cut off by the restart and would otherwise show "Auditing…" with the button disabled for ever.
+  await pool.query(`UPDATE citation_audits SET status = 'failed', error = 'Interrupted by a restart. Run the audit again.', finished_at = now(), current_site = NULL WHERE status IN ('queued', 'running')`);
 }
 
 /** The campaign's count tiles. */
@@ -137,6 +140,10 @@ export async function runAudit(auditId: number, deps: FinderDeps = defaultDeps):
     const rows = (await db.select().from(citations).where(eq(citations.campaignId, a.campaign_id)))
       .map((c) => ({ c, rank: citationRank.get(LEGACY_CITATION_NAMES[c.siteName] ?? c.siteName) ?? 999 })).sort((x, y) => x.rank - y.rank).map((x) => x.c);
     await pool.query(`UPDATE citation_audits SET total = $2 WHERE id = $1`, [auditId, rows.length]);
+    // The Google row is true only for a location linked to its Business Profile. A row the owner marked by
+    // hand (or imported) on an unlinked location is not evidence of a link, and is left as they marked it.
+    const [loc] = campaign.locationId ? await db.select().from(businessLocations).where(and(eq(businessLocations.id, campaign.locationId), eq(businessLocations.userId, a.user_id))) : [];
+    const googleLinked = !!loc?.gbpLocationName;
     let done = 0;
     for (const row of rows) {
       const dir = directoryByName(row.siteName);
@@ -145,7 +152,7 @@ export async function runAudit(auditId: number, deps: FinderDeps = defaultDeps):
       if (!dir) found = { result: "unsupported", listingUrl: row.listingUrl, reason: "This site is no longer on the checklist.", how: "none", fields: null, partial: false, evidence: { checked: [], candidates: [], searchUrl: null, title: null } };
       else if (dir.url === "google.com") {
         // Google: the linked profile is the truth, nothing to crawl.
-        found = row.isFound ? { result: "match", listingUrl: row.listingUrl, reason: "Linked to your Google Business Profile.", how: "none", fields: null, partial: false, evidence: { checked: [], candidates: [], searchUrl: null, title: null } }
+        found = googleLinked ? { result: "match", listingUrl: row.listingUrl, reason: "Linked to your Google Business Profile.", how: "none", fields: null, partial: false, evidence: { checked: [], candidates: [], searchUrl: null, title: null } }
           : { result: "unsupported", listingUrl: null, reason: "Link this location to your Google Business Profile and this row fills itself in.", how: "none", fields: null, partial: false, evidence: { checked: [], candidates: [], searchUrl: null, title: null } };
       } else {
         try { found = await checkDirectory(dir, profile, row.listingUrl, deps); }

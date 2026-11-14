@@ -3,7 +3,7 @@ import { getReferralSettings, saveReferralSettings, referralSettingsInput } from
 import { getReviewEscalationThreshold, saveReviewEscalationThreshold, reviewEscalationSettingsInput, escalatePrivateFeedback } from "./review-escalation";
 import { isPrivateFirstScore } from "@shared/review-flow";
 import { normalizeOtherReviewLinks, normalizePrimaryReviewUrl, reviewLinkLabel, type OtherReviewLink } from "@shared/review-links";
-import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
+import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, quotaKey, monthKey, type QuotaReservation } from "./growth-quotas";
 import { isConfigured as dataforseoConfigured, normalizeBusinessName } from "./seo/dataforseo";
 import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
 import { withBudget, SeoBudgetError } from "./seo/budget";
@@ -2555,7 +2555,7 @@ export async function registerRoutes(
       const apiKey = process.env.GOOGLE_PLACES_API_KEY;
       if (!apiKey) return res.status(500).json({ message: "API key not configured" });
 
-      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry&key=${apiKey}`;
+      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(String(placeId))}&fields=geometry&key=${apiKey}`;
       const detailRes = await fetch(url);
       const data = await detailRes.json() as any;
 
@@ -2615,13 +2615,31 @@ export async function registerRoutes(
   });
 
   // Ranking Grid Routes
+  // A grid runs inside this process (runRankingGridScan). One cut off by a restart would stay "running"
+  // for ever: the page would poll it without end and its credits would never come back. A scan still
+  // "running" after RANKING_GRID_STALE_MS that this process is not working on is closed as failed and,
+  // like any failed grid, gets its credits back. The status flip is one guarded UPDATE, so it refunds once.
+  const RANKING_GRID_STALE_MS = 30 * 60_000;
+  const rankingGridInFlight = new Set<number>();
+  async function closeStaleRankingGridScan<T extends { id: number; userId: number | null; gridSize: number; status: string; createdAt: Date }>(scan: T): Promise<T> {
+    if (scan.status !== "running" || rankingGridInFlight.has(scan.id)) return scan;
+    const started = new Date(scan.createdAt);
+    if (!(Date.now() - started.getTime() > RANKING_GRID_STALE_MS)) return scan;
+    const { rowCount } = await pool.query("UPDATE ranking_grid_scans SET status='failed' WHERE id=$1 AND status='running'", [scan.id]);
+    if (!rowCount) return scan;
+    const credits = gridCreditCost(scan.gridSize);
+    if (scan.userId != null) await refundReservation({ key: quotaKey(scan.userId, "rankings", monthKey(started)), remaining: credits }, credits);
+    console.warn(`[ranking-grid] scan ${scan.id} was left running by a restart: closed as failed, ${credits} credit(s) returned`);
+    return { ...scan, status: "failed" };
+  }
+
   // The Ranking Grid scan history cards: the owner's scans, newest first (the page polls every few
   // seconds while one is running).
   app.get("/api/ranking-grid/scans", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
       const scans = await storage.getRankingGridScans(ownerScope(req));
-      res.json(scans);
+      res.json(await Promise.all(scans.map(closeStaleRankingGridScan)));
     } catch (err: any) {
       fail500(res, "GET /api/ranking-grid/scans failed:", err);
     }
@@ -2632,8 +2650,9 @@ export async function registerRoutes(
   app.get("/api/ranking-grid/scans/:id", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
-      const scan = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
-      if (!scan) return res.status(404).json({ message: "Scan not found" });
+      const found = await storage.getRankingGridScanById(parseInt(req.params.id), ownerScope(req));
+      if (!found) return res.status(404).json({ message: "Scan not found" });
+      const scan = await closeStaleRankingGridScan(found);
       const results = await storage.getRankingGridResults(scan.id);
       res.json({ scan, results });
     } catch (err: any) {
@@ -2677,24 +2696,31 @@ export async function registerRoutes(
       const credits = gridCreditCost(Number(gridSize || 3));
       if (!(await reserveMonthlyQuota(req, res, "rankings", credits))) return;
       const reservation: QuotaReservation | undefined = res.locals.growthQuota;
-      const scan = await storage.createRankingGridScan({
-        userId: user.id,
-        businessName,
-        placeId,
-        address: address || null,
-        lat: String(lat),
-        lon: String(lon),
-        gridSize: gridSize || 3,
-        gridDistance: String(gridDistance || "1"),
-        keyword,
-        status: "running",
-        averageRank: null,
-      });
+      // A scan that could not even be saved never ran: its credits go back.
+      let scan: Awaited<ReturnType<typeof storage.createRankingGridScan>>;
+      try {
+        scan = await storage.createRankingGridScan({
+          userId: user.id,
+          businessName,
+          placeId,
+          address: address || null,
+          lat: String(lat),
+          lon: String(lon),
+          gridSize: Number(gridSize || 3),
+          gridDistance: String(gridDistance || "1"),
+          keyword,
+          status: "running",
+          averageRank: null,
+        });
+      } catch (e) { await refundReservation(reservation, credits); throw e; }
 
       // A grid that fails gives its credits back.
-      runRankingGridScan(scan.id, user.id, String(businessName), parseFloat(lat), parseFloat(lon), gridSize || 3, parseFloat(gridDistance || "1"), keyword)
+      const scanId = scan.id;
+      rankingGridInFlight.add(scanId);
+      runRankingGridScan(scanId, user.id, String(businessName), parseFloat(lat), parseFloat(lon), Number(gridSize || 3), parseFloat(gridDistance || "1"), keyword)
         .then(ok => { if (!ok) return refundReservation(reservation, credits); })
-        .catch(err => logError("Ranking grid scan error:", err));
+        .catch(err => logError("Ranking grid scan error:", err))
+        .finally(() => rankingGridInFlight.delete(scanId));
 
       res.json(scan);
     } catch (err: any) {
@@ -2874,6 +2900,7 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
+      if (!Number.isInteger(scanId)) return res.status(404).json({ message: "Scan not found" });
       const [scan] = await db.select().from(competitorScans).where(and(eq(competitorScans.id, scanId), eq(competitorScans.userId, userId)));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
       // Best-rated first, most-reviewed among equals; a listing with no rating yet goes last (Postgres puts
@@ -2912,6 +2939,7 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
+      if (!Number.isInteger(scanId)) return res.status(404).json({ message: "Scan not found" });
       // One transaction: ownership verified under a row lock first (a foreign id changes nothing),
       // an active scan cancelled and its month refunded, then listings and scan removed.
       const removed = await removeCompetitorScan(userId, scanId, new Date());
@@ -3453,7 +3481,9 @@ export async function registerRoutes(
   app.post("/api/citations/campaigns/:id/run", async (req, res) => {
     if (!(await requireCitationsPlan(req, res))) return;
     try {
-      const user = (req as any).user;
+      // The workspace owner for an agency team member, as on every other citation route.
+      const user = getDevUser(req, res);
+      if (!user) return;
       const id = parseInt(req.params.id);
       await ensureChecklist(id, user.id);
       res.json({ message: "Checklist ready", campaignId: id });

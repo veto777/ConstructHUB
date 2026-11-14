@@ -278,6 +278,13 @@ export function registerAssetRoutes(
       throw new ProviderError("Choose a date range within 16 months", 400);
     if (p.end && p.end > new Date().toISOString().slice(0, 10))
       throw new ProviderError("End date must not be in the future", 400);
+    // With no end date the import stops three days back (server/gsc/service.ts): a later start reads nothing.
+    if (
+      p.start &&
+      !p.end &&
+      p.start > new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)
+    )
+      throw new ProviderError("Search Console data runs about three days behind. Choose an earlier start date", 400);
     await budget(user, "sync");
     const {
       rows: [pending],
