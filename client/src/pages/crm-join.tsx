@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Loader2, UserPlus, AlertTriangle, HardHat } from "lucide-react";
 import { StatusPill, roleTone } from "@/components/crm-ui";
+import { resetCrmData } from "@/components/crm-division-switcher";
 
 interface Lookup {
   email: string;
@@ -64,7 +65,8 @@ export default function CrmJoinPage() {
   const accept = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/invitations/accept", { token, phone })).json(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      // Accepting switches the active company: drop everything cached for the previous one.
+      resetCrmData();
       toast({ title: "Welcome aboard" });
       navigate("/crm/team");
     },
