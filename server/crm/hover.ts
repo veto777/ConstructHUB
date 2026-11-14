@@ -2416,6 +2416,10 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     // A present-but-wrong signature is refused even with a valid key.
     if ((sig256 || sig1) && !signed && !isHandshake) return refuse("Bad signature");
     if (!signed && !keyOrgId && !isHandshake) return refuse("Bad signature");
+    // The unsigned handshake exists for the FIRST verification only: once the
+    // webhook is live, a bare guessed webhook id must not spend this org's
+    // HOVER token or write an error onto its Integrations card.
+    if (isHandshake && !signed && !keyOrgId && conn.webhook?.verified === true) return refuse("Bad signature");
     if (!signed && !keyOrgId) {
       console.warn(`[hover] webhook handshake for ${webhookId} arrived unsigned — verifying anyway`);
     }

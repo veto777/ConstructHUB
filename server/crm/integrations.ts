@@ -497,6 +497,9 @@ async function resolveStripeMethod(
   }
 }
 
+const escHtml = (s?: string | null) =>
+  String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
+
 /** Tell the contractor money landed. `methodDetail` names the real rail
  *  ("Visa •••• 4242", "bank transfer (ACH) — Chase •••• 6789") when known. */
 async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: string | null = null) {
@@ -532,7 +535,7 @@ async function notifyPaid(pay: typeof crmPayments.$inferSelect, methodDetail: st
     await sendWithFallback({
       to: [...to].join(","),
       subject: `💰 ${amount} received from ${cust?.displayName ?? "a client"}`,
-      html: `<p><strong>${amount}</strong> received from ${cust?.displayName ?? "a client"}${via}.</p>` +
+      html: `<p><strong>${escHtml(amount)}</strong> received from ${escHtml(cust?.displayName ?? "a client")}${escHtml(via)}.</p>` +
             `<p>Paid directly into your own Stripe account.</p>`,
     } as any);
   }

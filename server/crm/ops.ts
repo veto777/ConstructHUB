@@ -871,13 +871,25 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       phaseId: z.string().nullable().optional(), notes: z.string().max(2000).nullable().optional(),
     })).max(500) }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid budget", issues: parsed.error.issues });
-    await db.delete(crmBudgetLines)
-      .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.projectId, proj.id)));
-    if (parsed.data.lines.length) {
-      await db.insert(crmBudgetLines).values(parsed.data.lines.map((l) => ({
-        ...l, orgId: ctx.org.id, projectId: proj.id,
-      })) as any);
+    // Same reference check as the single-line routes, once per distinct pair.
+    const checked = new Set<string>();
+    for (const l of parsed.data.lines) {
+      const key = `${l.costCodeId}|${l.phaseId ?? ""}`;
+      if (checked.has(key)) continue;
+      checked.add(key);
+      const refErr = await budgetLineRefsError(ctx.org.id, proj.id, l.costCodeId, l.phaseId);
+      if (refErr) return res.status(400).json({ message: refErr });
     }
+    // One transaction: a failed insert must not leave the project with no budget.
+    await db.transaction(async (tx) => {
+      await tx.delete(crmBudgetLines)
+        .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.projectId, proj.id)));
+      if (parsed.data.lines.length) {
+        await tx.insert(crmBudgetLines).values(parsed.data.lines.map((l) => ({
+          ...l, orgId: ctx.org.id, projectId: proj.id,
+        })) as any);
+      }
+    });
     res.json({ ok: true, count: parsed.data.lines.length });
   });
 
