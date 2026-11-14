@@ -269,6 +269,8 @@ function crmOrigin(): string {
   return env || "https://portal.constructhub.us";
 }
 
+const escHtml = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
 /** One reminder for one series, on every channel Settings turned on. No amounts: the pop-up shows those, per seat. */
 async function sendReminder(org: typeof crmOrgs.$inferSelect, t: Task, meta: ReconcileMeta, day: number, settings: ReconcileSettings) {
   const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, t.customerId ?? "")).limit(1);
@@ -292,7 +294,7 @@ async function sendReminder(org: typeof crmOrgs.$inferSelect, t: Task, meta: Rec
         to: m.email,
         subject: `${org.name}: ${title}`,
         html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
-          <p style="font-size:16px">${body}</p>
+          <p style="font-size:16px">${escHtml(body)}</p>
           <p style="margin:24px 0"><a href="${url}" style="background:#ea580c;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Record the payment</a></p>
           <p style="font-size:13px;color:#666">You get this on the days set under Settings → Payments → Reconciliation prompts. It stops the moment a payment is recorded.</p>
         </div>`,
