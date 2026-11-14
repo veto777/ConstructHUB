@@ -17,7 +17,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { makeFetchCtx } from "./fetch-util";
 import { SALES_TAX_SOURCES } from "./sources";
 import { packResult, type BundledSalesTaxFile } from "./store";
-import type { SalesTaxSourceResult } from "./types";
+import { notYetInForce, type SalesTaxSourceResult } from "./types";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -42,8 +42,12 @@ async function main(): Promise<number> {
     if (only && !src.states.some((s) => only.includes(s))) continue;
     try {
       const got = (await src.load(ctx)).filter((r) => !only || only.includes(r.state));
-      for (const r of got) console.log(`fetched ${r.state} ${r.periodLabel} (${r.effectiveDate}) ${r.rows.length} rows — ${r.sourceUrl}`);
-      results.push(...got);
+      for (const r of got) {
+        console.log(`fetched ${r.state} ${r.periodLabel} (${r.effectiveDate}) ${r.rows.length} rows — ${r.sourceUrl}`);
+        // Posted ahead of its quarter: keep the table now in force; a run on or after that date loads it.
+        if (notYetInForce(r.effectiveDate)) console.log(`${r.state}: skipped — ${r.periodLabel} takes effect ${r.effectiveDate}, not loaded before then`);
+        else results.push(r);
+      }
     } catch (e: any) {
       failed++;
       console.error(`FAILED ${src.name} [${src.states.join(",")}]: ${e?.message ?? e}`);
