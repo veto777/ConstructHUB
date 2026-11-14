@@ -164,9 +164,11 @@ export default function CrmMigratePage() {
       ).json(),
     onSuccess: (data: ImportResponse) => {
       setResult(data);
-      if (entity === "customers") queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
-      if (entity === "estimates") queryClient.invalidateQueries({ queryKey: ["/api/crm/estimates"] });
-      if (entity === "invoices") queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      // Lists are cached under keys that carry their filters ("/api/crm/estimates?…"), and an estimate or
+      // invoice import also creates clients and jobs, so every one of those lists is refreshed.
+      queryClient.invalidateQueries({
+        predicate: (q) => /^\/api\/crm\/(customers|estimates|invoices|projects|stats)/.test(String(q.queryKey[0])),
+      });
     },
     onError: (e: any) =>
       toast({ title: "Import failed", description: apiErrorMessage(e), variant: "destructive" }),
