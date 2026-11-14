@@ -28,8 +28,9 @@ import type { Express } from "express";
 import { createHash, createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { db } from "../db";
 import { crmAppointments, crmCustomers, crmOrgs, crmProjects } from "@shared/schema";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { pinnedDivisionOf } from "./divisions";
 import { getBaseUrl } from "../auth";
 import { oauthBaseUrl } from "../site-context";
 import {
@@ -287,8 +288,11 @@ async function orgFeedEvents(orgId: string, memberId?: string): Promise<ICalEven
     .leftJoin(crmProjects, eq(crmProjects.id, crmAppointments.projectId))
     .leftJoin(crmCustomers, eq(crmCustomers.id, crmAppointments.customerId))
     .where(where)
-    .orderBy(asc(crmAppointments.startsAt))
+    // Newest 1,000 by start time (then put back in date order): taking the
+    // OLDEST 1,000 made every new visit vanish once an org passed the cap.
+    .orderBy(desc(crmAppointments.startsAt))
     .limit(1000);
+  rows.reverse();
 
   return rows.map(({ appointment: a, projectName, customerName, ...addr }) => ({
     id: a.id,
@@ -337,6 +341,11 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageSettings")) return;
+    // The company feed carries every division's visits; a seat pinned to one
+    // division must not read or rotate it (its own "me" calendar stays open).
+    if (pinnedDivisionOf(ctx.member)) {
+      return res.status(403).json({ message: "The company calendar covers every division. Ask an owner or an admin who is not limited to one division." });
+    }
 
     let state = feedStateOf(ctx.org);
     if (!state) {
@@ -354,6 +363,11 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageSettings")) return;
+    // The company feed carries every division's visits; a seat pinned to one
+    // division must not read or rotate it (its own "me" calendar stays open).
+    if (pinnedDivisionOf(ctx.member)) {
+      return res.status(403).json({ message: "The company calendar covers every division. Ask an owner or an admin who is not limited to one division." });
+    }
 
     const counter = (feedStateOf(ctx.org)?.counter ?? 0) + 1;
     const token = await mintFeedToken(ctx.org.id, counter);
@@ -505,6 +519,9 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     // member); otherwise the org-wide company calendar (owner/admin only).
     const scope = req.query?.scope === "me" ? "me" : "org";
     if (scope === "org" && !requirePermission(res, ctx, "manageSettings")) return;
+    if (scope === "org" && pinnedDivisionOf(ctx.member)) {
+      return res.status(403).json({ message: "The company calendar covers every division. Ask an owner or an admin who is not limited to one division." });
+    }
     if (!googleCalendarConfigured()) {
       return res.status(503).json({
         message: "Google Calendar sync isn't configured on this server yet.",
