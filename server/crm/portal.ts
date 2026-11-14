@@ -1697,7 +1697,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       },
       estimates: estimates.map((e) => ({
         id: e.id, number: e.number, title: e.title, status: e.status,
-        totalCents: e.totalCents, sentAt: e.sentAt, approvedAt: e.approvedAt,
+        // A signed estimate reads for what was signed (options and discounts picked at approval).
+        totalCents: e.approvedAt ? (e.approvedTotalCents ?? e.totalCents) : e.totalCents, sentAt: e.sentAt, approvedAt: e.approvedAt,
         declinedAt: e.declinedAt, expiresAt: e.expiresAt,
         link: `/e/${e.publicToken}`,
       })),
